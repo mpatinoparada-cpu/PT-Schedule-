@@ -211,7 +211,7 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
   <div class="logo">Purple <span>Tie</span></div>
   <div class="header-center">
     <span id="section-label" style="font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-light);padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap;">Supervisors</span>
-    <input type="text" id="sched-name" placeholder="Schedule name..." value="Week of May 26"/>
+    <input type="text" id="sched-name" placeholder="Schedule name..." value=""/>
     <div class="week-nav">
       <button class="btn btn-ghost" onclick="prevWeek()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="week-label" id="week-label">—</span>
@@ -533,9 +533,15 @@ function loadLocalData(){
   } catch(e){}
   return null;
 }
+function getAutoWeekName(){
+  const now = new Date();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  return 'Week of ' + mon.toLocaleDateString('en-US', {month:'long', day:'numeric'});
+}
 function defaultData(section){
-  if(section==='managers') return { name:'Managers Schedule', employees:['Manager 1','Manager 2'], shifts:[] };
-  return { name:'Week of May 26', employees:['Ana Lopez','Carlos Ruiz','Maria Torres'], shifts:[] };
+  if(section==='managers') return { name:getAutoWeekName(), employees:['Manager 1','Manager 2'], shifts:[] };
+  return { name:getAutoWeekName(), employees:['Ana Lopez','Carlos Ruiz','Maria Torres'], shifts:[] };
 }
 let data = loadLocalData() || defaultData(currentSection);
 let shareKey=null, pollTimer=null, weekOffset=0, editingIdx=null;
@@ -800,6 +806,8 @@ function cloudSave(){
   }, 1500);
 }
 function renderAll() {
+  if(!data.name) data.name = getAutoWeekName();
+  document.getElementById('sched-name').value = data.name;
   data.name=document.getElementById('sched-name').value||data.name;
   renderMetrics();
   renderAvail();

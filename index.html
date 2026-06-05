@@ -701,12 +701,12 @@ function renderGrid() {
     // total hours this week
     const hrs=getEmpHours(emp);
     const ot=hrs-OT_LIMIT;
-    const otBadge=ot>0?`<span style="color:#dc2626;font-size:9px;font-weight:700;background:#fee2e2;padding:1px 4px;border-radius:4px;margin-left:3px;white-space:nowrap;">+${ot}h OT</span>`:'';
+    const otBadge=ot>0?`<div style="color:#dc2626;font-size:9px;font-weight:700;background:#fee2e2;padding:1px 4px;border-radius:4px;margin-top:2px;white-space:nowrap;display:inline-block;">+${ot}h OT</div>`:'';
     const hrsColor=ot>0?'#dc2626':'var(--muted)';
     td0.innerHTML=`<div class="emp-inner">
       <div class="avatar" style="width:32px;height:32px;font-size:15.8px;background:${pal.bg};color:${pal.text};border:1.5px solid ${pal.border}">${initials(emp)}</div>
       <div style="min-width:0;overflow:hidden"><div class="emp-name-text" title="${emp}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp}</div>
-      <div class="emp-hours" style="color:${hrsColor};white-space:nowrap;display:flex;align-items:center;flex-wrap:nowrap;">${hrs}h/week${otBadge}</div></div>
+      <div class="emp-hours" style="color:${hrsColor};white-space:nowrap;">${hrs}h/week</div>${otBadge}</div>
     </div>`;
 
     // day cells — AM / PM split

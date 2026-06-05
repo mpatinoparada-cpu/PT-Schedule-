@@ -543,12 +543,24 @@ function switchSection(section){
   document.getElementById('nav-' + section).classList.add('active');
   // Update header section label
   const secInfo = SECTIONS[section];
-  document.getElementById('section-label').textContent = secInfo.icon + ' ' + secInfo.label;
+  document.getElementById('section-label').textContent = secInfo.label;
   // Load data for new section
   data = loadLocalData() || defaultData(section);
+  // Update URL with correct sync ID for this section
+  const newSyncId = localStorage.getItem(getSyncKey());
+  if(newSyncId && window.history.replaceState){
+    const url = new URL(window.location.href);
+    url.searchParams.set('sync', newSyncId);
+    url.searchParams.set('section', section);
+    window.history.replaceState({}, '', url.toString());
+  } else if(window.history.replaceState){
+    const url = new URL(window.location.href);
+    url.searchParams.set('section', section);
+    url.searchParams.delete('sync');
+    window.history.replaceState({}, '', url.toString());
+  }
   // Stop polling and restart if needed
   stopRealtime();
-  const newSyncId = localStorage.getItem(getSyncKey());
   if(newSyncId){ doRefresh().then(()=>startRealtime()); }
   renderAll();
   showNotify('Switched to ' + secInfo.label + ' schedule');
@@ -1145,10 +1157,20 @@ function sendShareEmail(){
   showNotify('Email app opened ✓');
 }
 
+function isModalOpen(){
+  const modals = ['modal-overlay','emp-overlay','share-overlay','syncid-overlay'];
+  return modals.some(id => !document.getElementById(id).classList.contains('hidden'));
+}
 function startRealtime(){
   if(firebaseListener) clearInterval(firebaseListener);
-  firebaseListener = setInterval(doRefresh, 60000);
-  document.getElementById('last-sync').textContent='Live sync ON';
+  firebaseListener = setInterval(()=>{
+    if(isModalOpen()){
+      document.getElementById('last-sync').textContent='Sync paused (editing...)';
+      return;
+    }
+    doRefresh();
+  }, 30000);
+  document.getElementById('last-sync').textContent='Auto-sync every 30s';
 }
 function stopRealtime(){
   if(firebaseListener){ clearInterval(firebaseListener); firebaseListener=null; }
@@ -1321,9 +1343,19 @@ document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.targe
 document.getElementById('emp-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('emp-overlay'))closeEmpModal();});
 document.getElementById('new-emp').addEventListener('keydown',e=>{if(e.key==='Enter')addEmployee();});
 
-// Auto-load sync ID from URL ?sync=BINID
+// Auto-load sync ID and section from URL
 (function(){
   const params = new URLSearchParams(window.location.search);
+  const sectionFromUrl = params.get('section');
+  if(sectionFromUrl && SECTIONS[sectionFromUrl]){
+    currentSection = sectionFromUrl;
+    // Update sidebar active state
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('nav-' + sectionFromUrl);
+    if(btn) btn.classList.add('active');
+    const label = document.getElementById('section-label');
+    if(label) label.textContent = SECTIONS[sectionFromUrl].label;
+  }
   const syncFromUrl = params.get('sync');
   if(syncFromUrl && syncFromUrl.trim()){
     localStorage.setItem(getSyncKey(), syncFromUrl.trim());

@@ -806,9 +806,8 @@ function cloudSave(){
   }, 1500);
 }
 function renderAll() {
-  if(!data.name) data.name = getAutoWeekName();
+  data.name = getAutoWeekName();
   document.getElementById('sched-name').value = data.name;
-  data.name=document.getElementById('sched-name').value||data.name;
   renderMetrics();
   renderAvail();
   renderLegend();

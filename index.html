@@ -535,9 +535,7 @@ function loadLocalData(){
 }
 function getAutoWeekName(){
   const now = new Date();
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - ((now.getDay()+6)%7));
-  return 'Week of ' + mon.toLocaleDateString('en-US', {month:'long', day:'numeric'});
+  return now.toLocaleDateString('en-US', {month:'long', year:'numeric'});
 }
 function defaultData(section){
   if(section==='managers') return { name:getAutoWeekName(), employees:['Manager 1','Manager 2'], shifts:[] };

@@ -494,6 +494,15 @@ function fmtH(h) {
   const d = wholeH > 12 ? wholeH - 12 : wholeH;
   return `${d}:${mins} ${s}${next}`;
 }
+function fmtHShort(h) {
+  // Short format: 9a, 12p, 1:30p — for grid cells
+  const hh = h >= 24 ? h - 24 : h;
+  const wholeH = Math.floor(hh);
+  const mins = (hh % 1 === 0.5) ? ':30' : '';
+  const s = wholeH < 12 ? 'a' : 'p';
+  const d = wholeH === 0 ? 12 : wholeH > 12 ? wholeH - 12 : wholeH;
+  return `${d}${mins}${s}`;
+}
 function todayIdx() { return (new Date().getDay() + 6) % 7; }
 function getWeekDates(off) {
   const now = new Date(), day = now.getDay();
@@ -692,12 +701,12 @@ function renderGrid() {
     // total hours this week
     const hrs=getEmpHours(emp);
     const ot=hrs-OT_LIMIT;
-    const otBadge=ot>0?`<span style="color:#dc2626;font-size:10px;font-weight:700;background:#fee2e2;padding:1px 5px;border-radius:6px;margin-left:3px">+${ot}h OT</span>`:'';
+    const otBadge=ot>0?`<div style="color:#dc2626;font-size:9px;font-weight:700;background:#fee2e2;padding:1px 4px;border-radius:4px;margin-top:2px;white-space:nowrap;">+${ot}h OT</div>`:'';
     const hrsColor=ot>0?'#dc2626':'var(--muted)';
     td0.innerHTML=`<div class="emp-inner">
       <div class="avatar" style="width:32px;height:32px;font-size:15.8px;background:${pal.bg};color:${pal.text};border:1.5px solid ${pal.border}">${initials(emp)}</div>
-      <div><div class="emp-name-text" title="${emp}">${emp}</div>
-      <div class="emp-hours" style="color:${hrsColor}">${hrs}h/week${otBadge}</div></div>
+      <div style="min-width:0;overflow:hidden"><div class="emp-name-text" title="${emp}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp}</div>
+      <div class="emp-hours" style="color:${hrsColor};white-space:nowrap">${hrs}h/week</div>${otBadge}</div>
     </div>`;
 
     // day cells — AM / PM split
@@ -739,7 +748,7 @@ function renderGrid() {
             const cellColor = isSpecialShift ? '#dc2626' : pal.text;
             block.style.cssText=`background:${cellBg};color:${cellColor};border:1px solid ${cellBorder};min-height:32px;`;
             block.innerHTML=`<div class="shift-top">
-                <span class="shift-hours" style="font-size:15px;">${fmtH(s.startH)}–${fmtH(s.endH)}</span>
+                <span class="shift-hours" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${fmtH(s.startH)}–${fmtH(s.endH)}">${fmtHShort(s.startH)}–${fmtHShort(s.endH)}</span>
                 <span class="shift-del" onclick="removeShift(event,${idx})">✕</span>
               </div>
               ${isSpecialShift?`<div class="shift-note" style="font-size:9px;font-weight:600;" title="${s.note}">${s.note}</div>`:s.note?`<div class="shift-note" style="font-size:9px;" title="${s.note}">${s.note}</div>`:''}`;

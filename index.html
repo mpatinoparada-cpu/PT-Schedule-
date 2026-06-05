@@ -581,6 +581,8 @@ function showNotify(msg) {
   setTimeout(()=>el.classList.remove('show'),4000);
 }
 
+const OT_LIMIT = 40;
+function getEmpHours(emp){ return data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0); }
 function renderMetrics() {
   const ti=todayIdx();
   let working=0, total=0;
@@ -589,13 +591,23 @@ function renderMetrics() {
   const maxSlots=data.employees.length*7;
   const pct=maxSlots>0?Math.round(total/maxSlots*100):0;
   let totalHrs=0;
-  ws.forEach(s=>totalHrs+=(s.endH-s.startH));
+  ws.forEach(s=>totalHrs+=(s.dayOff?0:s.endH-s.startH));
+  // Overtime calculation
+  let totalOT=0;
+  let otEmps=[];
+  data.employees.forEach(emp=>{
+    const hrs=getEmpHours(emp);
+    if(hrs>OT_LIMIT){ totalOT+=(hrs-OT_LIMIT); otEmps.push(emp.split(' ')[0]+': +'+(hrs-OT_LIMIT)+'h'); }
+  });
+  const otColor = totalOT>0 ? '#dc2626' : 'var(--accent)';
+  const otLabel = totalOT>0 ? `<span title="${otEmps.join(', ')}" style="cursor:help">${totalOT}h ⚠</span>` : '0h';
   document.getElementById('metrics').innerHTML=`
     <div class="metric"><div class="metric-label">On shift today</div><div class="metric-val">${working}</div></div>
-    <div class="metric"><div class="metric-label">Empleados</div><div class="metric-val">${data.employees.length}</div></div>
+    <div class="metric"><div class="metric-label">Employees</div><div class="metric-val">${data.employees.length}</div></div>
     <div class="metric"><div class="metric-label">Weekly shifts</div><div class="metric-val">${total}</div></div>
     <div class="metric"><div class="metric-label">Total hours</div><div class="metric-val">${totalHrs}</div></div>
     <div class="metric"><div class="metric-label">Coverage</div><div class="metric-val">${pct}%</div></div>
+    <div class="metric"><div class="metric-label" style="color:${otColor};font-weight:600">Overtime</div><div class="metric-val" style="color:${otColor}">${otLabel}</div></div>
   `;
 }
 
@@ -678,11 +690,14 @@ function renderGrid() {
     const td0=tr.insertCell();
     td0.className='emp-td';
     // total hours this week
-    const hrs=data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
+    const hrs=getEmpHours(emp);
+    const ot=hrs-OT_LIMIT;
+    const otBadge=ot>0?`<span style="color:#dc2626;font-size:10px;font-weight:700;background:#fee2e2;padding:1px 5px;border-radius:6px;margin-left:3px">+${ot}h OT</span>`:'';
+    const hrsColor=ot>0?'#dc2626':'var(--muted)';
     td0.innerHTML=`<div class="emp-inner">
       <div class="avatar" style="width:32px;height:32px;font-size:15.8px;background:${pal.bg};color:${pal.text};border:1.5px solid ${pal.border}">${initials(emp)}</div>
       <div><div class="emp-name-text" title="${emp}">${emp}</div>
-      <div class="emp-hours">${hrs}h/week</div></div>
+      <div class="emp-hours" style="color:${hrsColor}">${hrs}h/week${otBadge}</div></div>
     </div>`;
 
     // day cells — AM / PM split

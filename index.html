@@ -1064,11 +1064,15 @@ async function saveAll(){
     setStatus('Saved ✓');
     document.getElementById('last-sync').textContent='Saved: '+new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
     showNotify('Schedule saved to cloud ✓');
-    // Update URL with sync ID so it can be shared directly
-    const newBinId = localStorage.getItem(getSyncKey());
-    if(newBinId && window.history.replaceState){
+    // Update URL with both sync IDs so it can be shared directly
+    const syncS = localStorage.getItem(SECTIONS.supervisors.syncKey);
+    const syncM = localStorage.getItem(SECTIONS.managers.syncKey);
+    if(window.history.replaceState){
       const url = new URL(window.location.href);
-      url.searchParams.set('sync', newBinId);
+      if(syncS) url.searchParams.set('syncS', syncS);
+      if(syncM) url.searchParams.set('syncM', syncM);
+      url.searchParams.delete('sync');
+      url.searchParams.delete('section');
       window.history.replaceState({}, '', url.toString());
     }
     // resume auto-sync after 3 seconds to let the cloud settle
@@ -1101,11 +1105,14 @@ async function doRefresh(){
 }
 
 function getShareableLink(){
-  const binId = localStorage.getItem(getSyncKey());
-  if(!binId) return null;
-  // Use current page URL as base (works on any domain/netlify)
+  const syncS = localStorage.getItem(SECTIONS.supervisors.syncKey);
+  const syncM = localStorage.getItem(SECTIONS.managers.syncKey);
+  if(!syncS && !syncM) return null;
   const base = window.location.href.split('?')[0].split('#')[0];
-  return base + '?sync=' + binId;
+  let params = [];
+  if(syncS) params.push('syncS=' + syncS);
+  if(syncM) params.push('syncM=' + syncM);
+  return base + '?' + params.join('&');
 }
 function openShareModal(){
   const binId = localStorage.getItem(getSyncKey());
@@ -1343,23 +1350,17 @@ document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.targe
 document.getElementById('emp-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('emp-overlay'))closeEmpModal();});
 document.getElementById('new-emp').addEventListener('keydown',e=>{if(e.key==='Enter')addEmployee();});
 
-// Auto-load sync ID and section from URL
+// Auto-load both sync IDs from URL ?syncS=SUPERVISORS_ID&syncM=MANAGERS_ID
 (function(){
   const params = new URLSearchParams(window.location.search);
-  const sectionFromUrl = params.get('section');
-  if(sectionFromUrl && SECTIONS[sectionFromUrl]){
-    currentSection = sectionFromUrl;
-    // Update sidebar active state
-    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.getElementById('nav-' + sectionFromUrl);
-    if(btn) btn.classList.add('active');
-    const label = document.getElementById('section-label');
-    if(label) label.textContent = SECTIONS[sectionFromUrl].label;
-  }
+  // Load both sync IDs if present
+  const syncS = params.get('syncS');
+  const syncM = params.get('syncM');
+  if(syncS && syncS.trim()) localStorage.setItem(SECTIONS.supervisors.syncKey, syncS.trim());
+  if(syncM && syncM.trim()) localStorage.setItem(SECTIONS.managers.syncKey, syncM.trim());
+  // Legacy single sync support
   const syncFromUrl = params.get('sync');
-  if(syncFromUrl && syncFromUrl.trim()){
-    localStorage.setItem(getSyncKey(), syncFromUrl.trim());
-  }
+  if(syncFromUrl && syncFromUrl.trim()) localStorage.setItem(getSyncKey(), syncFromUrl.trim());
 })();
 
 renderAll();

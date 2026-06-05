@@ -36,6 +36,17 @@ body{font-family:'Jost',sans-serif;background:var(--bg);color:var(--text);min-he
 
 /* ── Layout ── */
 .app{display:grid;grid-template-rows:58px 1fr;min-height:100vh}
+
+/* ── Sidebar ── */
+.app-body{display:flex;min-height:calc(100vh - 58px)}
+.sidebar{width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:6px;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto}
+.sidebar-title{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);font-weight:600;padding:4px 10px;margin-bottom:4px}
+.sidebar-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);border:none;background:transparent;color:var(--text);cursor:pointer;font-family:'Jost',sans-serif;font-size:15px;width:100%;text-align:left;transition:all 0.15s}
+.sidebar-btn:hover{background:var(--accent-light);color:var(--accent)}
+.sidebar-btn.active{background:var(--accent);color:#fff;font-weight:500}
+.sidebar-btn svg{width:16px;height:16px;flex-shrink:0}
+.sidebar-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.main-content{flex:1;min-width:0}
 header{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
 .logo{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:30px;font-weight:500;color:var(--accent);letter-spacing:-0.5px;flex-shrink:0}
 .logo span{color:var(--muted)}
@@ -199,6 +210,7 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
 <header>
   <div class="logo">Purple <span>Tie</span></div>
   <div class="header-center">
+    <span id="section-label" style="font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-light);padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap;">Supervisors</span>
     <input type="text" id="sched-name" placeholder="Schedule name..." value="Week of May 26"/>
     <div class="week-nav">
       <button class="btn btn-ghost" onclick="prevWeek()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -298,6 +310,22 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
   </div>
 </div>
 
+<div class="app-body">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-title">Schedules</div>
+  <button class="sidebar-btn active" id="nav-supervisors" onclick="switchSection('supervisors')">
+    
+    <span>Supervisors</span>
+  </button>
+  <button class="sidebar-btn" id="nav-managers" onclick="switchSection('managers')">
+    
+    <span>Managers</span>
+  </button>
+</nav>
+
+<div class="main-content">
 <main>
 
   <div id="share-bar" class="share-bar" style="display:none">
@@ -333,7 +361,8 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
   </div>
 
 </main>
-</div>
+</div><!-- end main-content -->
+</div><!-- end app-body -->
 
 <!-- Turno modal -->
 <div class="overlay hidden" id="modal-overlay">
@@ -475,23 +504,55 @@ function getWeekDates(off) {
 function fmtDate(d) { return d.toLocaleDateString('en',{day:'numeric',month:'short'}); }
 function initials(n) { return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
-const LOCAL_KEY = 'purpletie_schedule';
-const SYNC_KEY = 'purpletie_jsonbin_id';
 const JSONBIN_API = 'https://api.jsonbin.io/v3/b';
 const JSONBIN_MASTER_KEY = '$2a$10$/9Me3OWYsNZa0XbWKU3Hg.1m6ZplMMNg06134to5OWVF7QDTyQJGq';
+
+// Two separate sections: supervisors and managers
+const SECTIONS = {
+  supervisors: { localKey:'purpletie_schedule', syncKey:'purpletie_jsonbin_id', label:'Supervisors', icon:'' },
+  managers:    { localKey:'purpletie_managers_schedule', syncKey:'purpletie_managers_jsonbin_id', label:'Managers', icon:'' }
+};
+let currentSection = 'supervisors';
+
+function getLocalKey(){ return SECTIONS[currentSection].localKey; }
+function getSyncKey(){ return SECTIONS[currentSection].syncKey; }
+
 function loadLocalData(){
   try {
-    const saved = localStorage.getItem(LOCAL_KEY);
+    const saved = localStorage.getItem(getLocalKey());
     if(saved) return JSON.parse(saved);
   } catch(e){}
   return null;
 }
-let data = loadLocalData() || {
-  name:'Week of May 26',
-  employees:['Ana Lopez','Carlos Ruiz','Maria Torres'],
-  shifts:[]
-};
+function defaultData(section){
+  if(section==='managers') return { name:'Managers Schedule', employees:['Manager 1','Manager 2'], shifts:[] };
+  return { name:'Week of May 26', employees:['Ana Lopez','Carlos Ruiz','Maria Torres'], shifts:[] };
+}
+let data = loadLocalData() || defaultData(currentSection);
 let shareKey=null, pollTimer=null, weekOffset=0, editingIdx=null;
+
+function switchSection(section){
+  if(section === currentSection) return;
+  // Save current section data first
+  localStorage.setItem(getLocalKey(), JSON.stringify(data));
+  // Switch
+  currentSection = section;
+  weekOffset = 0;
+  // Update sidebar buttons
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + section).classList.add('active');
+  // Update header section label
+  const secInfo = SECTIONS[section];
+  document.getElementById('section-label').textContent = secInfo.icon + ' ' + secInfo.label;
+  // Load data for new section
+  data = loadLocalData() || defaultData(section);
+  // Stop polling and restart if needed
+  stopRealtime();
+  const newSyncId = localStorage.getItem(getSyncKey());
+  if(newSyncId){ doRefresh().then(()=>startRealtime()); }
+  renderAll();
+  showNotify('Switched to ' + secInfo.label + ' schedule');
+}
 
 function palette(emp) {
   const i = data.employees.indexOf(emp);
@@ -680,7 +741,7 @@ function renderGrid() {
 function autoSave(){
   try{
     data.name=document.getElementById('sched-name').value||data.name;
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    localStorage.setItem(getLocalKey(), JSON.stringify(data));
   }catch(e){}
 }
 let cloudSaveTimer=null;
@@ -689,7 +750,7 @@ function cloudSave(){
   // debounce — wait 1.5s after last change before pushing to cloud
   if(cloudSaveTimer) clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(async()=>{
-    const binId=localStorage.getItem(SYNC_KEY);
+    const binId=localStorage.getItem(getSyncKey());
     if(!binId) return; // no cloud configured yet
     try{
       await fetch(`${JSONBIN_API}/${binId}`,{
@@ -966,8 +1027,8 @@ async function saveAll(){
   data.shifts=[...data.shifts];
   setStatus('Saving...');
   try{
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-    let binId = localStorage.getItem(SYNC_KEY);
+    localStorage.setItem(getLocalKey(), JSON.stringify(data));
+    let binId = localStorage.getItem(getSyncKey());
     let response;
     if(binId){
       response = await fetch(`${JSONBIN_API}/${binId}`, {
@@ -984,7 +1045,7 @@ async function saveAll(){
       if(response.ok){
         const result = await response.json();
         binId = result.metadata.id;
-        localStorage.setItem(SYNC_KEY, binId);
+        localStorage.setItem(getSyncKey(), binId);
       }
     }
     if(!response.ok) throw new Error('Save error');
@@ -992,7 +1053,7 @@ async function saveAll(){
     document.getElementById('last-sync').textContent='Saved: '+new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
     showNotify('Schedule saved to cloud ✓');
     // Update URL with sync ID so it can be shared directly
-    const newBinId = localStorage.getItem(SYNC_KEY);
+    const newBinId = localStorage.getItem(getSyncKey());
     if(newBinId && window.history.replaceState){
       const url = new URL(window.location.href);
       url.searchParams.set('sync', newBinId);
@@ -1008,7 +1069,7 @@ async function saveAll(){
 }
 async function doRefresh(){
   try{
-    const binId = localStorage.getItem(SYNC_KEY);
+    const binId = localStorage.getItem(getSyncKey());
     if(!binId){setStatus('No cloud save found. Press Save first.',false);showNotify('Press Save first to sync.');return;}
     const response = await fetch(`${JSONBIN_API}/${binId}/latest`, {
       headers:{'X-Master-Key':JSONBIN_MASTER_KEY}
@@ -1018,7 +1079,7 @@ async function doRefresh(){
     if(!result||!result.record) return;
     const prev=JSON.stringify(data.shifts);
     data=result.record;
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    localStorage.setItem(getLocalKey(), JSON.stringify(data));
     document.getElementById('sched-name').value=data.name;
     renderAll();
     if(JSON.stringify(data.shifts)!==prev)showNotify('Schedule updated ✓');
@@ -1028,14 +1089,14 @@ async function doRefresh(){
 }
 
 function getShareableLink(){
-  const binId = localStorage.getItem(SYNC_KEY);
+  const binId = localStorage.getItem(getSyncKey());
   if(!binId) return null;
   // Use current page URL as base (works on any domain/netlify)
   const base = window.location.href.split('?')[0].split('#')[0];
   return base + '?sync=' + binId;
 }
 function openShareModal(){
-  const binId = localStorage.getItem(SYNC_KEY);
+  const binId = localStorage.getItem(getSyncKey());
   const noSave = document.getElementById('share-nosave-notice');
   const linkSection = document.getElementById('share-link-section');
   const sendBtn = document.getElementById('share-send-btn');
@@ -1089,6 +1150,10 @@ function startRealtime(){
   firebaseListener = setInterval(doRefresh, 60000);
   document.getElementById('last-sync').textContent='Live sync ON';
 }
+function stopRealtime(){
+  if(firebaseListener){ clearInterval(firebaseListener); firebaseListener=null; }
+  document.getElementById('last-sync').textContent='';
+}
 function startPoll(){}
 function copyCode(){
   const c=document.getElementById('share-code').textContent;
@@ -1096,7 +1161,7 @@ function copyCode(){
 }
 function loadCode(){
   // always open modal so user can see/change their Sync ID
-  const existing = localStorage.getItem(SYNC_KEY) || '';
+  const existing = localStorage.getItem(getSyncKey()) || '';
   document.getElementById('syncid-input').value = existing;
   document.getElementById('syncid-overlay').classList.remove('hidden');
   setTimeout(()=>{ 
@@ -1110,7 +1175,7 @@ function closeSyncModal(){
 function confirmSyncId(){
   const id = document.getElementById('syncid-input').value.trim();
   if(!id){alert('Please paste a valid Sync ID.');return;}
-  localStorage.setItem(SYNC_KEY, id);
+  localStorage.setItem(getSyncKey(), id);
   closeSyncModal();
   doRefresh().then(()=>startRealtime());
   showNotify('Connecting...');
@@ -1261,13 +1326,13 @@ document.getElementById('new-emp').addEventListener('keydown',e=>{if(e.key==='En
   const params = new URLSearchParams(window.location.search);
   const syncFromUrl = params.get('sync');
   if(syncFromUrl && syncFromUrl.trim()){
-    localStorage.setItem(SYNC_KEY, syncFromUrl.trim());
+    localStorage.setItem(getSyncKey(), syncFromUrl.trim());
   }
 })();
 
 renderAll();
 // On load: sync once from cloud if we have a key, then keep auto-polling
-if(localStorage.getItem(SYNC_KEY)){
+if(localStorage.getItem(getSyncKey())){
   doRefresh().then(()=>startRealtime());
 }
 </script>

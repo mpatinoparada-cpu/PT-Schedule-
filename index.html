@@ -119,7 +119,7 @@ td.emp-td{padding:6px 8px;background:var(--surface2);position:sticky;left:0;z-in
 .emp-hours{font-size:10px;color:var(--muted);font-family:'Calibri','Carlito',sans-serif}
 
 /* day cell */
-td.day-td{padding:4px;cursor:pointer;min-height:48px;height:48px;position:relative;transition:background 0.12s}
+td.day-td{padding:4px;cursor:pointer;min-height:48px;height:48px;position:relative;transition:background 0.12s;overflow:hidden;}
 td.day-td:hover{background:var(--accent-light)}
 td.day-td.today-td{background:#f5f0ff}
 td.day-td.today-td:hover{background:#ede9fe}
@@ -129,8 +129,8 @@ td.day-td.has-shift:hover{background:transparent}
 /* shift block */
 .shift-block{border-radius:8px;padding:5px 8px;height:100%;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:filter 0.12s;min-height:40px}
 .shift-block:hover{filter:brightness(0.96)}
-.shift-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
-.shift-hours{font-family:'Calibri','Carlito',sans-serif;font-size:15px;font-weight:500}
+.shift-top{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.shift-hours{font-family:'Calibri','Carlito',sans-serif;font-size:20px;font-weight:500}
 .shift-del{opacity:0;font-size:16.5px;cursor:pointer;line-height:1;padding:1px;border-radius:3px}
 .shift-block:hover .shift-del{opacity:0.6}
 .shift-del:hover{opacity:1!important;background:rgba(0,0,0,0.08)}
@@ -151,8 +151,8 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
 .field select:focus,.field input:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
 .field textarea{resize:vertical;min-height:60px;line-height:1.5}
 .time-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
-.del-btn{margin-right:auto}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;}
+.del-btn{margin-right:auto;flex-shrink:0;}
 
 /* emp modal */
 .emp-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)}
@@ -219,6 +219,10 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
     </div>
   </div>
   <div class="header-actions">
+    <button class="btn" id="grid-mode-btn" onclick="toggleGridMode()" title="Toggle grid view">
+      <svg id="grid-mode-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+      <span id="grid-mode-label">Full Cell</span>
+    </button>
     <button class="btn" onclick="manageEmployees()">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>Employees</span>
@@ -316,20 +320,24 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
 
 <div class="app-body">
 
-<!-- Sidebar -->
-<nav class="sidebar">
-  <div class="sidebar-title">Schedules</div>
-  <button class="sidebar-btn active" id="nav-supervisors" onclick="switchSection('supervisors')">
-    
-    <span>Supervisors</span>
+<!-- Section switcher floating button -->
+<div id="section-switcher" style="position:fixed;bottom:24px;left:16px;z-index:150;">
+  <button onclick="toggleSectionMenu()" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:40px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(109,40,217,0.35);">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    <span id="switcher-label">Supervisors</span>
+    <svg id="switcher-arrow" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
   </button>
-  <button class="sidebar-btn" id="nav-managers" onclick="switchSection('managers')">
-    
-    <span>Managers</span>
-  </button>
-</nav>
+  <div id="section-menu" style="display:none;position:absolute;bottom:calc(100% + 8px);left:0;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:var(--shadow-md);overflow:hidden;min-width:160px;">
+    <button class="sidebar-btn active" id="nav-supervisors" onclick="switchSection('supervisors');toggleSectionMenu()" style="width:100%;border-radius:0;padding:11px 16px;">
+      <span>Supervisors</span>
+    </button>
+    <button class="sidebar-btn" id="nav-managers" onclick="switchSection('managers');toggleSectionMenu()" style="width:100%;border-radius:0;padding:11px 16px;">
+      <span>Managers</span>
+    </button>
+  </div>
+</div>
 
-<div class="main-content">
+<div class="main-content" style="width:100%;">
 <main>
 
   <div id="share-bar" class="share-bar" style="display:none">
@@ -388,20 +396,31 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
           <button class="btn type-btn" data-type="Sick" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Sick')">Sick</button>
           <button class="btn type-btn" data-type="Without Pay" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Without Pay')">Without Pay</button>
           <button class="btn type-btn" data-type="Unavailable" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Unavailable')">Unavailable</button>
+          <button class="btn type-btn" data-type="" style="background:#ede9fe;border-color:#c4b5f4;color:#6d28d9;justify-content:center;font-size:13px;grid-column:1/-1;" onclick="selectType('');fillHours(6,22);">⬛ Full Day (6 AM – 10 PM)</button>
         </div>
       </div>
     <div class="time-row">
       <div class="field">
         <label>Start time</label>
         <div class="scroll-picker-wrap" id="start-wrap">
-          <div class="scroll-picker-display" id="start-display" onclick="togglePicker('start')">9:00 AM ▾</div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input type="text" id="start-input" placeholder="9:00 AM" autocomplete="off"
+              style="flex:1;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;"
+              oninput="onPickerInput('start')" onkeydown="onPickerKey(event,'start')" onfocus="buildDrum('start');document.getElementById('start-drum').classList.remove('hidden');document.getElementById('end-drum').classList.add('hidden')"/>
+            <div class="scroll-picker-display" id="start-display" onclick="togglePicker('start')" style="padding:8px 10px;white-space:nowrap;">▾</div>
+          </div>
           <div class="scroll-picker-drum hidden" id="start-drum"></div>
         </div>
       </div>
       <div class="field">
         <label>End time</label>
         <div class="scroll-picker-wrap" id="end-wrap">
-          <div class="scroll-picker-display" id="end-display" onclick="togglePicker('end')">5:00 PM ▾</div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input type="text" id="end-input" placeholder="5:00 PM" autocomplete="off"
+              style="flex:1;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;"
+              oninput="onPickerInput('end')" onkeydown="onPickerKey(event,'end')" onfocus="buildDrum('end');document.getElementById('end-drum').classList.remove('hidden');document.getElementById('start-drum').classList.add('hidden')"/>
+            <div class="scroll-picker-display" id="end-display" onclick="togglePicker('end')" style="padding:8px 10px;white-space:nowrap;">▾</div>
+          </div>
           <div class="scroll-picker-drum hidden" id="end-drum"></div>
         </div>
       </div>
@@ -500,7 +519,10 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const START_H = 0, END_H = 30;
 const HOURS_LIST = [];
-for (let h = START_H; h <= END_H; h++) { HOURS_LIST.push(h); if(h < END_H) HOURS_LIST.push(h + 0.5); }
+for (let h = START_H; h <= END_H; h++) {
+  HOURS_LIST.push(h);
+  if(h < END_H){ HOURS_LIST.push(h+0.25); HOURS_LIST.push(h+0.5); HOURS_LIST.push(h+0.75); }
+}
 
 // Purple-toned palette per employee (20 colors)
 const EMP_PALETTES = [
@@ -530,11 +552,12 @@ function fmtH(h) {
   const next = h >= 24 ? ' +1' : '';
   const hh = h >= 24 ? h - 24 : h;
   const wholeH = Math.floor(hh);
-  const mins = (hh % 1 === 0.5) ? '30' : '00';
-  if(wholeH === 0 && mins === '00') return '12:00 AM' + next;
-  if(wholeH === 0 && mins === '30') return '12:30 AM' + next;
-  if(wholeH === 12 && mins === '00') return '12:00 PM' + next;
-  if(wholeH === 12 && mins === '30') return '12:30 PM' + next;
+  const frac = Math.round((hh % 1) * 60);
+  const mins = frac === 0 ? '00' : frac < 10 ? '0'+frac : ''+frac;
+  if(wholeH === 0 && frac === 0) return '12:00 AM' + next;
+  if(wholeH === 0) return `12:${mins} AM${next}`;
+  if(wholeH === 12 && frac === 0) return '12:00 PM' + next;
+  if(wholeH === 12) return `12:${mins} PM${next}`;
   const s = wholeH < 12 ? 'AM' : 'PM';
   const d = wholeH > 12 ? wholeH - 12 : wholeH;
   return `${d}:${mins} ${s}${next}`;
@@ -589,6 +612,21 @@ function defaultData(section){
 let data = loadLocalData() || defaultData(currentSection);
 let shareKey=null, pollTimer=null, weekOffset=0, editingIdx=null;
 
+function toggleSectionMenu(){
+  const menu = document.getElementById('section-menu');
+  const arrow = document.getElementById('switcher-arrow');
+  const open = menu.style.display === 'none';
+  menu.style.display = open ? 'block' : 'none';
+  arrow.style.transform = open ? 'rotate(180deg)' : '';
+}
+// close menu when clicking outside
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#section-switcher')){
+    document.getElementById('section-menu').style.display='none';
+    document.getElementById('switcher-arrow').style.transform='';
+  }
+});
+
 function switchSection(section){
   if(section === currentSection) return;
   // Save current section data first
@@ -602,6 +640,7 @@ function switchSection(section){
   // Update header section label
   const secInfo = SECTIONS[section];
   document.getElementById('section-label').textContent = secInfo.label;
+  document.getElementById('switcher-label').textContent = secInfo.label;
   // Load data for new section
   data = loadLocalData() || defaultData(section);
   // Update URL with correct sync ID for this section
@@ -791,57 +830,120 @@ function renderGrid() {
         bar.addEventListener('click', e=>{ if(!e.target.closest('[onclick]')) openModal(di, emp, idx); });
         td.appendChild(bar);
       } else {
-      // Normal AM | PM split
+      // Normal AM | PM split or Full cell depending on gridMode
       {
         const wrapper=document.createElement('div');
-        wrapper.style.cssText='display:grid;grid-template-columns:1fr 1fr;height:100%;min-height:70px;';
 
-        ['AM','PM'].forEach(period=>{
-          const isAM = period==='AM';
-          const half=document.createElement('div');
-          half.style.cssText=`display:flex;flex-direction:column;gap:2px;padding:3px;border-right:${isAM?'1px dashed var(--border)':'none'};min-height:70px;`;
-
-          const label=document.createElement('div');
-          label.textContent=period;
-          label.style.cssText='font-size:9px;font-weight:600;letter-spacing:0.08em;color:var(--muted);text-align:center;margin-bottom:1px;opacity:0.7;';
-          half.appendChild(label);
-
-          const periodShifts=data.shifts
+        if(gridMode === 'full'){
+          // Full cell — all shifts stacked, no AM/PM split
+          wrapper.style.cssText='display:flex;flex-direction:column;gap:2px;padding:3px;height:100%;min-height:70px;';
+          const allShifts=data.shifts
             .map((s,idx)=>({s,idx}))
-            .filter(({s})=>{
-              if(s.emp!==emp||s.day!==di||s.week!==weekOffset) return false;
-              return isAM ? s.startH < 12 : s.startH >= 12;
-            })
+            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset)
             .sort((a,b)=>a.s.startH-b.s.startH);
 
-          periodShifts.forEach(({s,idx})=>{
+          allShifts.forEach(({s,idx})=>{
             const block=document.createElement('div');
             block.className='shift-block';
-            const isSpecialShift = SPECIAL_TYPES.includes(s.shiftType||s.note);
-            const cellBg = isSpecialShift ? '#fee2e2' : (s.shiftColor || '#ffffff');
-            const cellBorder = isSpecialShift ? '#fca5a5' : (s.shiftColor ? s.shiftColor : pal.border);
-            const cellColor = isSpecialShift ? '#dc2626' : pal.text;
+            const isSpecialShift=SPECIAL_TYPES.includes(s.shiftType||s.note);
+            const cellBg=isSpecialShift?'#fee2e2':(s.shiftColor||'#ffffff');
+            const cellBorder=isSpecialShift?'#fca5a5':(s.shiftColor?s.shiftColor:pal.border);
+            const cellColor=isSpecialShift?'#dc2626':pal.text;
             block.style.cssText=`background:${cellBg};color:${cellColor};border:1px solid ${cellBorder};min-height:32px;`;
             block.innerHTML=`<div class="shift-top">
-                <span class="shift-hours" style="font-size:10px;line-height:1.3;word-break:break-word;white-space:normal;">${fmtH(s.startH)}–<br>${fmtH(s.endH)}</span>
+                <span class="shift-hours" style="font-size:20px;line-height:1.2;word-break:break-word;white-space:normal;">${fmtH(s.startH)}–<br>${fmtH(s.endH)}</span>
                 <span class="shift-del" onclick="removeShift(event,${idx})">✕</span>
               </div>
               ${isSpecialShift?`<div class="shift-note" style="font-size:9px;font-weight:600;" title="${s.note}">${s.note}</div>`:s.note?`<div class="shift-note" style="font-size:9px;" title="${s.note}">${s.note}</div>`:''}`;
-            block.addEventListener('click', ()=>openModal(di, emp, idx));
-            half.appendChild(block);
+            block.addEventListener('click',()=>openModal(di,emp,idx));
+            wrapper.appendChild(block);
           });
 
-          // only show + if this half has no shift yet
-          if(periodShifts.length === 0){
+          if(allShifts.length===0){
             const addBtn=document.createElement('div');
-            addBtn.style.cssText='display:flex;align-items:center;justify-content:center;cursor:pointer;padding:2px 0;flex:1;';
+            addBtn.style.cssText='display:flex;align-items:center;justify-content:center;cursor:pointer;flex:1;';
             addBtn.innerHTML='<div class="plus" style="width:16px;height:16px;font-size:14px;border-radius:50%;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;color:var(--muted);">+</div>';
-            addBtn.addEventListener('click', ()=>openModal(di, emp, null, isAM?9:13));
-            half.appendChild(addBtn);
+            addBtn.addEventListener('click',()=>openModal(di,emp,null,9));
+            wrapper.appendChild(addBtn);
           }
 
-          wrapper.appendChild(half);
-        });
+        } else {
+          // AM | PM split — but if a shift spans both, render as full-width block
+          wrapper.style.cssText='display:grid;grid-template-columns:1fr 1fr;height:100%;min-height:70px;';
+
+          // Check if there's a shift that spans both AM and PM
+          const fullDayShifts = data.shifts
+            .map((s,idx)=>({s,idx}))
+            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset&&s.startH<12&&s.endH>12)
+            .sort((a,b)=>a.s.startH-b.s.startH);
+
+          if(fullDayShifts.length > 0){
+            // Render as a single full-width block over both columns
+            wrapper.style.cssText='display:flex;flex-direction:column;gap:2px;padding:3px;height:100%;min-height:70px;';
+            fullDayShifts.forEach(({s,idx})=>{
+              const block=document.createElement('div');
+              block.className='shift-block';
+              const isSpecialShift=SPECIAL_TYPES.includes(s.shiftType||s.note);
+              const cellBg=isSpecialShift?'#fee2e2':(s.shiftColor||'#ffffff');
+              const cellBorder=isSpecialShift?'#fca5a5':(s.shiftColor?s.shiftColor:pal.border);
+              const cellColor=isSpecialShift?'#dc2626':pal.text;
+              block.style.cssText=`background:${cellBg};color:${cellColor};border:1px solid ${cellBorder};min-height:32px;flex:1;`;
+              block.innerHTML=`<div class="shift-top">
+                  <span class="shift-hours" style="font-size:20px;line-height:1.2;word-break:break-word;white-space:normal;">${fmtH(s.startH)}–<br>${fmtH(s.endH)}</span>
+                  <span class="shift-del" onclick="removeShift(event,${idx})">✕</span>
+                </div>
+                ${isSpecialShift?`<div class="shift-note" style="font-size:9px;font-weight:600;" title="${s.note}">${s.note}</div>`:s.note?`<div class="shift-note" style="font-size:9px;" title="${s.note}">${s.note}</div>`:''}`;
+              block.addEventListener('click',()=>openModal(di,emp,idx));
+              wrapper.appendChild(block);
+            });
+          } else {
+          ['AM','PM'].forEach(period=>{
+            const isAM = period==='AM';
+            const half=document.createElement('div');
+            half.style.cssText=`display:flex;flex-direction:column;gap:2px;padding:3px;border-right:${isAM?'1px dashed var(--border)':'none'};min-height:70px;`;
+
+            const label=document.createElement('div');
+            label.textContent=period;
+            label.style.cssText='font-size:9px;font-weight:600;letter-spacing:0.08em;color:var(--muted);text-align:center;margin-bottom:1px;opacity:0.7;';
+            half.appendChild(label);
+
+            const periodShifts=data.shifts
+              .map((s,idx)=>({s,idx}))
+              .filter(({s})=>{
+                if(s.emp!==emp||s.day!==di||s.week!==weekOffset) return false;
+                return isAM ? s.startH < 12 : s.startH >= 12;
+              })
+              .sort((a,b)=>a.s.startH-b.s.startH);
+
+            periodShifts.forEach(({s,idx})=>{
+              const block=document.createElement('div');
+              block.className='shift-block';
+              const isSpecialShift=SPECIAL_TYPES.includes(s.shiftType||s.note);
+              const cellBg=isSpecialShift?'#fee2e2':(s.shiftColor||'#ffffff');
+              const cellBorder=isSpecialShift?'#fca5a5':(s.shiftColor?s.shiftColor:pal.border);
+              const cellColor=isSpecialShift?'#dc2626':pal.text;
+              block.style.cssText=`background:${cellBg};color:${cellColor};border:1px solid ${cellBorder};min-height:32px;`;
+              block.innerHTML=`<div class="shift-top">
+                  <span class="shift-hours" style="font-size:20px;line-height:1.2;word-break:break-word;white-space:normal;">${fmtH(s.startH)}–<br>${fmtH(s.endH)}</span>
+                  <span class="shift-del" onclick="removeShift(event,${idx})">✕</span>
+                </div>
+                ${isSpecialShift?`<div class="shift-note" style="font-size:9px;font-weight:600;" title="${s.note}">${s.note}</div>`:s.note?`<div class="shift-note" style="font-size:9px;" title="${s.note}">${s.note}</div>`:''}`;
+              block.addEventListener('click',()=>openModal(di,emp,idx));
+              half.appendChild(block);
+            });
+
+            if(periodShifts.length===0){
+              const addBtn=document.createElement('div');
+              addBtn.style.cssText='display:flex;align-items:center;justify-content:center;cursor:pointer;padding:2px 0;flex:1;';
+              addBtn.innerHTML='<div class="plus" style="width:16px;height:16px;font-size:14px;border-radius:50%;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;color:var(--muted);">+</div>';
+              addBtn.addEventListener('click',()=>openModal(di,emp,null,isAM?9:13));
+              half.appendChild(addBtn);
+            }
+
+            wrapper.appendChild(half);
+          });
+          } // end else (no full-day shift)
+        }
 
         td.appendChild(wrapper);
       }
@@ -875,6 +977,28 @@ function cloudSave(){
     }catch(e){ /* silent fail, local copy is safe */ }
   }, 1500);
 }
+let gridMode = 'ampm'; // 'ampm' | 'full'
+function toggleGridMode(){
+  gridMode = gridMode === 'ampm' ? 'full' : 'ampm';
+  const btn = document.getElementById('grid-mode-btn');
+  const label = document.getElementById('grid-mode-label');
+  const icon = document.getElementById('grid-mode-icon');
+  if(gridMode === 'full'){
+    label.textContent = 'AM/PM';
+    icon.innerHTML = '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/>';
+    btn.style.background = 'var(--accent-light)';
+    btn.style.borderColor = 'var(--accent-mid)';
+    btn.style.color = 'var(--accent)';
+  } else {
+    label.textContent = 'Full Cell';
+    icon.innerHTML = '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }
+  renderGrid();
+}
+
 function renderAll() {
   data.name = getAutoWeekName();
   document.getElementById('sched-name').value = data.name;
@@ -898,27 +1022,59 @@ function fillHours(startVal, endVal) {
 }
 
 function updateDisplay(which) {
-  document.getElementById(which+'-display').textContent = fmtH(pickerVals[which]) + ' ▾';
+  document.getElementById(which+'-input').value = fmtH(pickerVals[which]);
 }
 
 function buildDrum(which) {
   const drum = document.getElementById(which+'-drum');
   const list = document.createElement('div');
   list.className = 'drum-list';
+  const inputVal = document.getElementById(which+'-input').value.trim().toLowerCase();
   HOURS_LIST.forEach(h => {
+    const label = fmtH(h);
+    if(inputVal && !label.toLowerCase().startsWith(inputVal) && !label.toLowerCase().includes(inputVal)) return;
     const item = document.createElement('div');
     item.className = 'drum-item' + (h === pickerVals[which] ? ' selected' : '');
-    item.textContent = fmtH(h);
-    item.addEventListener('click', () => selectHour(which, h));
+    item.textContent = label;
+    item.addEventListener('mousedown', e=>{ e.preventDefault(); selectHour(which, h); });
     list.appendChild(item);
   });
   drum.innerHTML = '';
   drum.appendChild(list);
-  // scroll to selected after render
   setTimeout(() => {
     const sel = list.querySelector('.selected');
     if(sel) sel.scrollIntoView({block:'center', behavior:'instant'});
   }, 30);
+}
+
+function onPickerInput(which) {
+  buildDrum(which);
+  document.getElementById(which+'-drum').classList.remove('hidden');
+}
+
+function onPickerKey(e, which) {
+  if(e.key === 'Enter' || e.key === 'Tab') {
+    // try to parse typed time
+    const parsed = parseTypedTime(document.getElementById(which+'-input').value);
+    if(parsed !== null){ pickerVals[which] = parsed; updateDisplay(which); }
+    document.getElementById(which+'-drum').classList.add('hidden');
+  }
+  if(e.key === 'Escape') document.getElementById(which+'-drum').classList.add('hidden');
+}
+
+function parseTypedTime(str) {
+  str = str.trim().toLowerCase().replace(/\s+/g,' ');
+  // formats: "9", "9:30", "9:15 am", "930", "21:00"
+  const m = str.match(/^(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?$/);
+  if(!m) return null;
+  let h = parseInt(m[1]);
+  const mins = m[2] ? parseInt(m[2]) : 0;
+  const ampm = m[3];
+  if(ampm === 'pm' && h < 12) h += 12;
+  if(ampm === 'am' && h === 12) h = 0;
+  if(h < 0 || h > 30) return null;
+  if(![0,15,30,45].includes(mins)) return null;
+  return h + mins/60;
 }
 
 function togglePicker(which) {
@@ -928,6 +1084,7 @@ function togglePicker(which) {
   if(drum.classList.contains('hidden')) {
     buildDrum(which);
     drum.classList.remove('hidden');
+    document.getElementById(which+'-input').focus();
   } else {
     drum.classList.add('hidden');
   }
@@ -937,16 +1094,24 @@ function selectHour(which, h) {
   pickerVals[which] = h;
   updateDisplay(which);
   document.getElementById(which+'-drum').classList.add('hidden');
-  buildDrum(which);
 }
 
 function parseHourInput(which) {
+  // first try to parse whatever is typed
+  const parsed = parseTypedTime(document.getElementById(which+'-input').value);
+  if(parsed !== null) { pickerVals[which] = parsed; }
   return pickerVals[which];
 }
 
 document.addEventListener('click', e => {
-  if(!e.target.closest('.scroll-picker-wrap'))
-    document.querySelectorAll('.scroll-picker-drum').forEach(d=>d.classList.add('hidden'));
+  if(!e.target.closest('.scroll-picker-wrap')) {
+    ['start','end'].forEach(which => {
+      document.getElementById(which+'-drum').classList.add('hidden');
+      // parse whatever was typed
+      const parsed = parseTypedTime(document.getElementById(which+'-input').value);
+      if(parsed !== null){ pickerVals[which] = parsed; updateDisplay(which); }
+    });
+  }
 });
 
 function openModal(dayIdx, emp, shIdx, defaultStart) {

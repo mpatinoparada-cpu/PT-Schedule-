@@ -1080,14 +1080,13 @@ async function saveAll(){
     document.getElementById('last-sync').textContent='Saved: '+new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
     showNotify('Schedule saved to cloud ✓');
     // Update URL with both sync IDs so it can be shared directly
+    // Always read BOTH keys from localStorage (one may have been saved in a previous session)
     const syncS = localStorage.getItem(SECTIONS.supervisors.syncKey);
     const syncM = localStorage.getItem(SECTIONS.managers.syncKey);
     if(window.history.replaceState){
-      const url = new URL(window.location.href);
+      const url = new URL(window.location.href.split('?')[0]); // start clean
       if(syncS) url.searchParams.set('syncS', syncS);
       if(syncM) url.searchParams.set('syncM', syncM);
-      url.searchParams.delete('sync');
-      url.searchParams.delete('section');
       window.history.replaceState({}, '', url.toString());
     }
     // resume auto-sync after 3 seconds to let the cloud settle

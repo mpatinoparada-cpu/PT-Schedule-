@@ -952,6 +952,26 @@ function renderGrid() {
   });
 }
 
+async function pushToCloud(){
+  autoSave();
+  if(cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  // pause polling so it doesn't overwrite our change
+  stopRealtime();
+  const binId=localStorage.getItem(getSyncKey());
+  if(!binId){ startRealtime(); return; }
+  try{
+    await fetch(`${FIREBASE_DB}/schedules/${binId}.json`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data)
+    });
+    setStatus('Saved ✓');
+    document.getElementById('last-sync').textContent='Saved: '+new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ setStatus('Saved locally only',false); }
+  // resume polling after 3s
+  setTimeout(()=>startRealtime(), 3000);
+}
+
 function autoSave(){
   try{
     data.name=document.getElementById('sched-name').value||data.name;
@@ -1269,7 +1289,7 @@ function removeShift(e,idx){
   e.stopPropagation();
   data.shifts.splice(idx,1);
   renderAll();
-  cloudSave();
+  pushToCloud();
   setStatus('Shift deleted ✓');
 }
 function deleteCurrentShift(){
@@ -1277,6 +1297,7 @@ function deleteCurrentShift(){
   data.shifts.splice(editingIdx,1);
   closeModal();
   renderAll();
+  pushToCloud();
   setStatus('Shift deleted.');
 }
 

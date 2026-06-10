@@ -513,8 +513,8 @@ function getWeekDates(off) {
 function fmtDate(d) { return d.toLocaleDateString('en',{day:'numeric',month:'short'}); }
 function initials(n) { return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
-const JSONBIN_API = 'https://api.jsonbin.io/v3/b';
-const JSONBIN_MASTER_KEY = '$2a$10$/9Me3OWYsNZa0XbWKU3Hg.1m6ZplMMNg06134to5OWVF7QDTyQJGq';
+// Firebase config
+const FIREBASE_DB = 'https://purple-tie-fdb7d-default-rtdb.firebaseio.com';
 
 // Two separate sections: supervisors and managers
 const SECTIONS = {
@@ -793,9 +793,9 @@ function cloudSave(){
     const binId=localStorage.getItem(getSyncKey());
     if(!binId) return; // no cloud configured yet
     try{
-      await fetch(`${JSONBIN_API}/${binId}`,{
+      await fetch(`${FIREBASE_DB}/schedules/${binId}.json`,{
         method:'PUT',
-        headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_MASTER_KEY},
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify(data)
       });
       setStatus('Auto-saved ✓');
@@ -1050,11 +1050,6 @@ function nextWeek(){weekOffset++;renderAll();}
 
 // Storage / share
 function getKey(){if(!shareKey)shareKey='ts_'+Math.random().toString(36).slice(2,10);return shareKey;}
-const JSONBIN_KEY = '$2a$10$/9Me3OWYsNZa0XbWKU3Hg.1m6ZplMMNg06134to5OWVF7QDTyQJGq';
-const JSONBIN_BIN_KEY = 'purpletie_bin_id';
-const FIREBASE_URL = 'https://purple-tie-default-rtdb.firebaseio.com';
-const FIREBASE_PATH = '/schedule.json';
-const APP_URL = 'https://vermillion-cobbler-790e9b.netlify.app';
 let firebaseListener = null;
 
 
@@ -1070,25 +1065,16 @@ async function saveAll(){
   try{
     localStorage.setItem(getLocalKey(), JSON.stringify(data));
     let binId = localStorage.getItem(getSyncKey());
-    let response;
-    if(binId){
-      response = await fetch(`${JSONBIN_API}/${binId}`, {
-        method:'PUT',
-        headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_MASTER_KEY},
-        body:JSON.stringify(data)
-      });
-    } else {
-      response = await fetch(JSONBIN_API, {
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_MASTER_KEY,'X-Bin-Name':'PurpleTie','X-Bin-Private':'false'},
-        body:JSON.stringify(data)
-      });
-      if(response.ok){
-        const result = await response.json();
-        binId = result.metadata.id;
-        localStorage.setItem(getSyncKey(), binId);
-      }
+    // If no binId, create a new unique one
+    if(!binId){
+      binId = 'pt_' + Math.random().toString(36).slice(2,12);
+      localStorage.setItem(getSyncKey(), binId);
     }
+    const response = await fetch(`${FIREBASE_DB}/schedules/${binId}.json`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data)
+    });
     if(!response.ok) throw new Error('Save error');
     setStatus('Saved ✓');
     document.getElementById('last-sync').textContent='Saved: '+new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
@@ -1116,14 +1102,12 @@ async function doRefresh(){
   try{
     const binId = localStorage.getItem(getSyncKey());
     if(!binId){setStatus('No cloud save found. Press Save first.',false);showNotify('Press Save first to sync.');return;}
-    const response = await fetch(`${JSONBIN_API}/${binId}/latest`, {
-      headers:{'X-Master-Key':JSONBIN_MASTER_KEY}
-    });
+    const response = await fetch(`${FIREBASE_DB}/schedules/${binId}.json`);
     if(!response.ok) throw new Error('Fetch failed');
     const result = await response.json();
-    if(!result||!result.record) return;
+    if(!result) return;
     const prev=JSON.stringify(data.shifts);
-    data=result.record;
+    data=result;
     localStorage.setItem(getLocalKey(), JSON.stringify(data));
     document.getElementById('sched-name').value=data.name;
     renderAll();

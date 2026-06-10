@@ -764,6 +764,33 @@ function renderGrid() {
       td.className='day-td'+(di===ti&&weekOffset===0?' today-td':'');
       td.style.cssText='padding:0;vertical-align:top;height:auto;min-height:56px;cursor:default;';
 
+      // Check if this day has a full-day (range) day off
+      const SPECIAL_TYPES=['Day Off','Sick','Without Pay','Unavailable'];
+      const rangeDayOff = data.shifts.find(s=>
+        s.emp===emp && s.day===di && s.week===weekOffset &&
+        s.dayOff && s.startH===0 && s.endH===24
+      );
+
+      if(rangeDayOff){
+        // Render as a solid full-height bar
+        const idx = data.shifts.indexOf(rangeDayOff);
+        const typeColors = {
+          'Day Off':      {bg:'#fee2e2', border:'#fca5a5', text:'#dc2626'},
+          'Sick':         {bg:'#fee2e2', border:'#fca5a5', text:'#dc2626'},
+          'Without Pay':  {bg:'#fef3c7', border:'#fcd34d', text:'#92400e'},
+          'Unavailable':  {bg:'#f3f4f6', border:'#d1d5db', text:'#374151'},
+        };
+        const tc = typeColors[rangeDayOff.shiftType] || typeColors['Day Off'];
+        const label = rangeDayOff.shiftType || 'Day Off';
+        const noteHtml = rangeDayOff.note && rangeDayOff.note !== label
+          ? `<div style="font-size:9px;opacity:0.75;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${rangeDayOff.note}</div>`
+          : '';
+        const bar = document.createElement('div');
+        bar.style.cssText=`background:${tc.bg};border-left:3px solid ${tc.border};color:${tc.text};height:100%;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;cursor:pointer;`;
+        bar.innerHTML=`<div style="font-size:10px;font-weight:700;text-align:center;letter-spacing:0.04em;">${label}</div>${noteHtml}<span style="opacity:0.5;font-size:14px;margin-top:4px;cursor:pointer;" onclick="removeShift(event,${idx})">✕</span>`;
+        bar.addEventListener('click', e=>{ if(!e.target.closest('[onclick]')) openModal(di, emp, idx); });
+        td.appendChild(bar);
+      } else {
       // Normal AM | PM split
       {
         const wrapper=document.createElement('div');
@@ -779,7 +806,6 @@ function renderGrid() {
           label.style.cssText='font-size:9px;font-weight:600;letter-spacing:0.08em;color:var(--muted);text-align:center;margin-bottom:1px;opacity:0.7;';
           half.appendChild(label);
 
-          const SPECIAL_TYPES=['Day Off','Sick','Without Pay','Unavailable'];
           const periodShifts=data.shifts
             .map((s,idx)=>({s,idx}))
             .filter(({s})=>{
@@ -819,6 +845,7 @@ function renderGrid() {
 
         td.appendChild(wrapper);
       }
+      } // end else normal
     });
   });
 }

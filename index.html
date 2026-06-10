@@ -231,6 +231,10 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
       <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <span>Print</span>
     </button>
+    <button class="btn" onclick="openDateRangeModal()" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;" title="Day Off by date range">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Day Off Range</span>
+    </button>
     <button class="btn btn-accent" onclick="saveAll()">
       <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2l11 0 5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       <span>Save</span>
@@ -444,6 +448,47 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
     <div class="modal-actions">
       <button class="btn btn-accent" onclick="closeEmpModal()">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Listo
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Date Range Day Off Modal -->
+<div class="overlay hidden" id="daterange-overlay">
+  <div class="modal" style="width:min(360px,92vw)">
+    <h3>&#128197; Day Off &mdash; Date Range</h3>
+    <div class="field">
+      <label>Employee</label>
+      <select id="dr-emp"></select>
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="dr-type">
+        <option value="Day Off">Day Off</option>
+        <option value="Sick">Sick</option>
+        <option value="Without Pay">Without Pay</option>
+        <option value="Unavailable">Unavailable</option>
+      </select>
+    </div>
+    <div class="time-row">
+      <div class="field">
+        <label>From</label>
+        <input type="date" id="dr-from" style="width:100%;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;"/>
+      </div>
+      <div class="field">
+        <label>To</label>
+        <input type="date" id="dr-to" style="width:100%;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>Note (optional)</label>
+      <textarea id="dr-note" placeholder="e.g. vacation, medical leave..." style="width:100%;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;resize:vertical;min-height:52px;"></textarea>
+    </div>
+    <div id="dr-preview" style="font-size:14px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeDateRangeModal()">Cancel</button>
+      <button class="btn btn-accent" onclick="confirmDateRange()">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Apply
       </button>
     </div>
   </div>
@@ -919,6 +964,82 @@ function selectType(type){
   });
 }
 function assignDayOff(){ selectType('Day Off'); }
+
+// ── Date Range Day Off ──
+function openDateRangeModal(){
+  const empSel = document.getElementById('dr-emp');
+  empSel.innerHTML = data.employees.map(e=>`<option value="${e}">${e}</option>`).join('');
+  // default dates to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('dr-from').value = today;
+  document.getElementById('dr-to').value = today;
+  document.getElementById('dr-note').value = '';
+  document.getElementById('dr-preview').textContent = '';
+  document.getElementById('daterange-overlay').classList.remove('hidden');
+  // live preview
+  ['dr-from','dr-to','dr-emp'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', updateDrPreview);
+  });
+  updateDrPreview();
+}
+function closeDateRangeModal(){
+  document.getElementById('daterange-overlay').classList.add('hidden');
+}
+function updateDrPreview(){
+  const from = document.getElementById('dr-from').value;
+  const to   = document.getElementById('dr-to').value;
+  const el   = document.getElementById('dr-preview');
+  if(!from || !to){ el.textContent=''; return; }
+  const d1 = new Date(from + 'T00:00:00');
+  const d2 = new Date(to   + 'T00:00:00');
+  if(d2 < d1){ el.textContent='⚠ End date must be after start date.'; return; }
+  const days = Math.round((d2-d1)/(1000*60*60*24))+1;
+  el.textContent = `${days} day${days>1?'s':''} selected (${d1.toLocaleDateString('en',{month:'short',day:'numeric'})} – ${d2.toLocaleDateString('en',{month:'short',day:'numeric'})})`;
+}
+function confirmDateRange(){
+  const emp  = document.getElementById('dr-emp').value;
+  const type = document.getElementById('dr-type').value;
+  const note = document.getElementById('dr-note').value.trim();
+  const from = document.getElementById('dr-from').value;
+  const to   = document.getElementById('dr-to').value;
+  if(!from||!to){alert('Please select both dates.');return;}
+  const d1 = new Date(from+'T00:00:00');
+  const d2 = new Date(to  +'T00:00:00');
+  if(d2<d1){alert('End date must be after start date.');return;}
+
+  // Iterate each day in the range and add a Day Off shift
+  let added = 0;
+  for(let d = new Date(d1); d <= d2; d.setDate(d.getDate()+1)){
+    // figure out which week offset this date falls on
+    const now = new Date();
+    const todayMon = new Date(now);
+    todayMon.setDate(now.getDate() - ((now.getDay()+6)%7));
+    todayMon.setHours(0,0,0,0);
+    const diffDays = Math.round((d - todayMon)/(1000*60*60*24));
+    const wk = Math.floor(diffDays/7);
+    const dayIdx = ((d.getDay()+6)%7); // 0=Mon … 6=Sun
+
+    // skip if already has a day-off on this slot
+    const exists = data.shifts.some(s=>s.emp===emp&&s.day===dayIdx&&s.week===wk&&s.dayOff);
+    if(exists) continue;
+
+    data.shifts.push({
+      emp, day:dayIdx, week:wk,
+      startH:0, endH:24,
+      note: note || type,
+      dayOff: true,
+      shiftType: type,
+      shiftColor: ''
+    });
+    added++;
+  }
+
+  closeDateRangeModal();
+  renderAll();
+  cloudSave();
+  showNotify(`${added} day${added!==1?'s':''} marked as ${type} ✓`);
+  setStatus('Day Off range saved ✓');
+}
 function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');editingIdx=null;}
 
 function confirmShift(){
@@ -1177,7 +1298,7 @@ function sendShareEmail(){
 }
 
 function isModalOpen(){
-  const modals = ['modal-overlay','emp-overlay','share-overlay','syncid-overlay'];
+  const modals = ['modal-overlay','emp-overlay','share-overlay','syncid-overlay','daterange-overlay'];
   return modals.some(id => !document.getElementById(id).classList.contains('hidden'));
 }
 function startRealtime(){
@@ -1360,6 +1481,7 @@ function doPrint(){
 // close on backdrop
 document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('modal-overlay'))closeModal();});
 document.getElementById('emp-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('emp-overlay'))closeEmpModal();});
+document.getElementById('daterange-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('daterange-overlay'))closeDateRangeModal();});
 document.getElementById('new-emp').addEventListener('keydown',e=>{if(e.key==='Enter')addEmployee();});
 
 // Auto-load both sync IDs from URL ?syncS=SUPERVISORS_ID&syncM=MANAGERS_ID

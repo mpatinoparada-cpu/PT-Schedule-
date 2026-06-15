@@ -118,7 +118,7 @@ table.sched tbody tr:hover td.emp-td{background:var(--accent-light)}
 td.emp-td{padding:6px 8px;background:var(--surface2);position:sticky;left:0;z-index:5;border-right:1px solid var(--border2) !important;width:110px;min-width:90px;}
 .emp-inner{display:flex;align-items:center;gap:8px}
 .emp-name-text{font-size:15px;font-weight:500;color:var(--text);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;max-width:90px;line-height:1.3;word-break:break-word;}
-.emp-hours{font-size:10px;color:var(--muted);font-family:'Calibri','Carlito',sans-serif}
+.emp-hours{font-size:15px;color:var(--muted);font-family:'Calibri','Carlito',sans-serif}
 
 /* day cell */
 td.day-td{padding:4px;cursor:pointer;min-height:48px;height:48px;position:relative;transition:background 0.12s;overflow:hidden;}
@@ -797,7 +797,7 @@ function renderGrid() {
     td0.innerHTML=`<div class="emp-inner">
       <div class="avatar" style="width:32px;height:32px;font-size:15.8px;background:${pal.bg};color:${pal.text};border:1.5px solid ${pal.border}">${initials(emp)}</div>
       <div style="min-width:0;overflow:hidden"><div class="emp-name-text" title="${emp}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp}</div>
-      <div class="emp-hours" style="color:${hrsColor};white-space:nowrap;">${hrs}h/week</div>${otBadge}</div>
+      <div class="emp-hours" style="color:${hrsColor};white-space:nowrap;">${hrs}h</div>${otBadge}</div>
     </div>`;
 
     // day cells — AM / PM split
@@ -1598,7 +1598,7 @@ function doPrint(){
           <div style="width:34px;height:34px;border-radius:50%;background:${pal.bg} !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:${pal.text};border:2px solid ${pal.border};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;font-family:'Calibri','Carlito',sans-serif;flex-shrink:0">${ini}</div>
           <div>
             <div style="font-size:13px;font-weight:500;color:${pal.text};font-family:Jost,sans-serif;">${emp.split(' ')[0]}</div>
-            <div style="font-size:10px;color:${pal.text};opacity:0.7;font-family:'Calibri','Carlito',sans-serif;">${hrs}h/week</div>
+            <div style="font-size:10px;color:${pal.text};opacity:0.7;font-family:'Calibri','Carlito',sans-serif;">${hrs}h</div>
           </div>
         </div>
       </td>`;
@@ -1768,7 +1768,7 @@ async function doExportPDF(){
             <div style="width:34px;height:34px;border-radius:50%;background:${pal.bg};color:${pal.text};border:2px solid ${pal.border};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;font-family:'Calibri','Carlito',sans-serif;flex-shrink:0">${ini}</div>
             <div>
               <div style="font-size:13px;font-weight:500;color:${pal.text};font-family:Jost,sans-serif;">${emp.split(' ')[0]}</div>
-              <div style="font-size:10px;color:${pal.text};opacity:0.7;font-family:'Calibri','Carlito',sans-serif;">${hrs}h/week</div>
+              <div style="font-size:10px;color:${pal.text};opacity:0.7;font-family:'Calibri','Carlito',sans-serif;">${hrs}h</div>
             </div>
           </div>
         </td>`;

@@ -880,6 +880,7 @@ function renderGrid() {
           if(fullDayShifts.length > 0){
             // Render as a single full-width block over both columns
             wrapper.style.cssText='display:flex;flex-direction:column;gap:2px;padding:3px;height:100%;min-height:70px;';
+            // Render full day shifts first
             fullDayShifts.forEach(({s,idx})=>{
               const block=document.createElement('div');
               block.className='shift-block';
@@ -896,6 +897,8 @@ function renderGrid() {
               block.addEventListener('click',()=>openModal(di,emp,idx));
               wrapper.appendChild(block);
             });
+            // Also render any other (non-fullDay) shifts in the same cell — none expected since confirmShift clears them
+
           } else {
           ['AM','PM'].forEach(period=>{
             const isAM = period==='AM';
@@ -1276,6 +1279,10 @@ function confirmShift(){
     if(overlap){alert('This time overlaps with an existing shift. Please choose a different time.');return;}
   }
   const isSpecial = currentShiftType !== '';
+  // if Full Day, remove any existing shifts in the same cell first
+  if(modalFullDay){
+    data.shifts = data.shifts.filter(s=>!(s.emp===emp&&s.day===day&&s.week===weekOffset));
+  }
   data.shifts.push({emp,day,week:weekOffset,startH,endH,
     note: isSpecial ? currentShiftType : note,
     dayOff: isSpecial,

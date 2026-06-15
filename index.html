@@ -1138,6 +1138,7 @@ document.addEventListener('click', e => {
 });
 
 function openModal(dayIdx, emp, shIdx, defaultStart) {
+  stopRealtime();
   editingIdx=shIdx;
   modalFullDay = false;
   const sh=shIdx!==null?data.shifts[shIdx]:null;
@@ -1258,7 +1259,7 @@ function confirmDateRange(){
   showNotify(`${added} day${added!==1?'s':''} marked as ${type} ✓`);
   setStatus('Day Off range saved ✓');
 }
-function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');editingIdx=null;}
+function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');editingIdx=null;startRealtime();}
 
 function confirmShift(){
   const emp=document.getElementById('m-emp').value;

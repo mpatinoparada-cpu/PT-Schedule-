@@ -354,16 +354,6 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
     <span style="margin-left:auto;font-size:15px;color:var(--muted)" id="last-sync"></span>
   </div>
 
-  <div class="metrics" id="metrics"></div>
-
-  <div class="avail-section">
-    <div class="sec-title">
-      <span>Today's availability</span>
-      <span id="today-label" style="font-family:'Calibri','Carlito',sans-serif;font-size:15px;color:var(--accent)"></span>
-    </div>
-    <div class="avail-chips" id="avail-chips"></div>
-  </div>
-
   <div class="legend" id="legend"></div>
 
   <div class="grid-card">
@@ -1604,9 +1594,13 @@ function doPrint(){
         const rowBg=isToday?'#f5f0ff':'#ffffff';
         const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===weekOffset).sort((a,b)=>a.startH-b.startH);
 
+        // Detect full-width shifts: dayOff range (startH=0,endH=24) or fullDay flag
+        const fullWidthShifts = dayShifts.filter(s=>(s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true);
+        const normalShifts = dayShifts.filter(s=>!((s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true));
+
         // AM shifts (startH < 12) and PM shifts (startH >= 12)
-        const amShifts=dayShifts.filter(s=>s.dayOff||s.startH<12);
-        const pmShifts=dayShifts.filter(s=>!s.dayOff&&s.startH>=12);
+        const amShifts=normalShifts.filter(s=>s.startH<12);
+        const pmShifts=normalShifts.filter(s=>s.startH>=12);
 
         function shiftBlock(s){
           if(s.dayOff) return `<div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;border-radius:6px;padding:6px 4px;background:#fee2e2 !important;border:1px solid #fca5a5;color:#dc2626;font-size:9px;font-weight:700;text-align:center;font-family:Jost,sans-serif;width:100%;">${s.note||'Day Off'}</div>`;
@@ -1618,17 +1612,26 @@ function doPrint(){
 
         const amContent=amShifts.map(s=>shiftBlock(s)).join('');
         const pmContent=pmShifts.map(s=>shiftBlock(s)).join('');
+        const fullWidthContent=fullWidthShifts.map(s=>shiftBlock(s)).join('');
 
-        const cellContent=`<div style="display:grid;grid-template-columns:1fr 1fr;height:100%;gap:0;">
-          <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:3px;border-right:1px dashed #e0d9f7;vertical-align:top;">
-            <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">AM</div>
-            ${amContent}
-          </div>
-          <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:3px;vertical-align:top;">
-            <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">PM</div>
-            ${pmContent}
-          </div>
-        </div>`;
+        let cellContent;
+        if(fullWidthShifts.length>0){
+          // Full width block spanning both columns
+          cellContent=`<div style="padding:3px;height:100%;">
+            ${fullWidthContent}
+          </div>`;
+        } else {
+          cellContent=`<div style="display:grid;grid-template-columns:1fr 1fr;height:100%;gap:0;">
+            <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:3px;border-right:1px dashed #e0d9f7;vertical-align:top;">
+              <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">AM</div>
+              ${amContent}
+            </div>
+            <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:3px;vertical-align:top;">
+              <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">PM</div>
+              ${pmContent}
+            </div>
+          </div>`;
+        }
 
         cells+=`<td style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0;border-right:1px solid #e0d9f7;border-bottom:1px solid #e0d9f7;min-height:60px;vertical-align:top;background:${rowBg} !important;">${cellContent}</td>`;
       });
@@ -1641,13 +1644,7 @@ function doPrint(){
   const totalHrs=ws.reduce((a,s)=>a+(s.endH-s.startH),0);
   const pct=data.employees.length*7>0?Math.round(ws.length/(data.employees.length*7)*100):0;
 
-  const metricsHtml=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;">
-    ${[['On shift today',working],['Employees',data.employees.length],['Weekly shifts',ws.length],['Total hours',totalHrs],['Coverage',pct+'%']].map(([label,val])=>`
-    <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ede9fe !important;border-radius:10px;padding:12px 14px;border:1px solid #c4b5f4;">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#7c6fa0;margin-bottom:4px;font-family:Jost,sans-serif;">${label}</div>
-      <div style="font-size:22px;font-weight:300;font-family:'Calibri','Carlito',sans-serif;color:#6d28d9;">${val}</div>
-    </div>`).join('')}
-  </div>`;
+  const metricsHtml=``;
 
   const legendHtml='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
     data.employees.map((emp,i)=>{

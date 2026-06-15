@@ -396,7 +396,7 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
           <button class="btn type-btn" data-type="Sick" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Sick')">Sick</button>
           <button class="btn type-btn" data-type="Without Pay" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Without Pay')">Without Pay</button>
           <button class="btn type-btn" data-type="Unavailable" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;justify-content:center;font-size:13px;" onclick="selectType('Unavailable')">Unavailable</button>
-          <button class="btn type-btn" data-type="" style="background:#ede9fe;border-color:#c4b5f4;color:#6d28d9;justify-content:center;font-size:13px;grid-column:1/-1;" onclick="selectType('');fillHours(6,22);">⬛ Full Day (6 AM – 10 PM)</button>
+          <button class="btn type-btn" data-type="" style="background:#ede9fe;border-color:#c4b5f4;color:#6d28d9;justify-content:center;font-size:13px;grid-column:1/-1;" onclick="selectType('');fillHours(6,22);modalFullDay=true;">⬛ Full Day (6 AM – 10 PM)</button>
         </div>
       </div>
     <div class="time-row">
@@ -874,7 +874,7 @@ function renderGrid() {
           // Check if there's a shift that spans both AM and PM
           const fullDayShifts = data.shifts
             .map((s,idx)=>({s,idx}))
-            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset&&s.startH<12&&s.endH>12)
+            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset&&s.fullDay===true)
             .sort((a,b)=>a.s.startH-b.s.startH);
 
           if(fullDayShifts.length > 0){
@@ -1136,7 +1136,9 @@ document.addEventListener('click', e => {
 
 function openModal(dayIdx, emp, shIdx, defaultStart) {
   editingIdx=shIdx;
+  modalFullDay = false;
   const sh=shIdx!==null?data.shifts[shIdx]:null;
+  if(sh && sh.fullDay) modalFullDay = true;
   document.getElementById('modal-title').textContent=sh?`Edit shift — ${emp.split(' ')[0]}`:`Assign shift — ${emp.split(' ')[0]}`;
 
   const empSel=document.getElementById('m-emp');
@@ -1159,6 +1161,7 @@ function openModal(dayIdx, emp, shIdx, defaultStart) {
 
 let currentShiftType = '';
 let currentColor = '';
+let modalFullDay = false;
 
 function selectColor(color){
   currentColor = color;
@@ -1277,7 +1280,8 @@ function confirmShift(){
     note: isSpecial ? currentShiftType : note,
     dayOff: isSpecial,
     shiftType: currentShiftType,
-    shiftColor: currentColor
+    shiftColor: currentColor,
+    fullDay: modalFullDay
   });
   closeModal();
   renderAll();

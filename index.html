@@ -1924,13 +1924,9 @@ async function doExportPDF(){
       segments.push({ top, bottom });
     });
 
-    // Segment for footer (after last row)
-    if(tableRows.length > 0){
-      const lastRow = tableRows[tableRows.length - 1];
-      const footerTop = (docTop(lastRow) + lastRow.offsetHeight) * scale;
-      if(footerTop < fullCanvas.height){
-        segments.push({ top: footerTop, bottom: fullCanvas.height });
-      }
+    // Extend the last row segment to include the footer below it
+    if(tableRows.length > 0 && segments.length > 1){
+      segments[segments.length - 1].bottom = fullCanvas.height;
     }
 
     // Also capture thead as its own strip to repeat on subsequent pages
@@ -1957,16 +1953,6 @@ async function doExportPDF(){
     // Max canvas-px that fit vertically per page
     const pageHFirst = contentH / pdfContentRatio;
     const pageHRest  = (contentH - theadPdfH) / pdfContentRatio; // leave room for repeated header
-
-    // Merge tiny footer segment into the last data row so it never lands alone on a page
-    if(segments.length > 1){
-      const last = segments[segments.length - 1];
-      const secondLast = segments[segments.length - 2];
-      if((last.bottom - last.top) < 60 * scale){
-        segments[segments.length - 2] = { top: secondLast.top, bottom: last.bottom };
-        segments.pop();
-      }
-    }
 
     // Group segments into pages
     const pages = [];

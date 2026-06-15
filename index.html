@@ -1929,43 +1929,26 @@ async function doExportPDF(){
       segments[segments.length - 1].bottom = fullCanvas.height;
     }
 
-    // Also capture thead as its own strip to repeat on subsequent pages
-    const theadEl = mframe.contentDocument.querySelector('table thead');
-    const theadTop = docTop(theadEl) * scale;
-    const theadH = theadEl.offsetHeight * scale;
-    const theadCoords = { top: theadTop, h: theadH };
-
     document.body.removeChild(mframe);
-
-    // Draw thead strip from fullCanvas into its own canvas
-    const theadCanvas = document.createElement('canvas');
-    theadCanvas.width = canvasW;
-    theadCanvas.height = theadH;
-    theadCanvas.getContext('2d').drawImage(fullCanvas, 0, theadCoords.top, canvasW, theadCoords.h, 0, 0, canvasW, theadCoords.h);
 
     // Margin in PDF points applied on all 4 sides
     const MARGIN = 24;
     const contentW = pdfW - MARGIN * 2;
     const contentH = pdfH - MARGIN * 2;
     const pdfContentRatio = contentW / canvasW;
-    const theadPdfH = theadCoords.h * pdfContentRatio;
 
-    // Max canvas-px that fit vertically per page
-    const pageHFirst = contentH / pdfContentRatio;
-    const pageHRest  = (contentH - theadPdfH) / pdfContentRatio; // leave room for repeated header
+    // Max canvas-px that fit vertically per page (same limit for all pages)
+    const pageHLimit = contentH / pdfContentRatio;
 
     // Group segments into pages
     const pages = [];
     let currentGroup = [];
     let currentH = 0;
-    let onFirstPage = true;
 
     for(const seg of segments){
       const segH = seg.bottom - seg.top;
-      const limit = onFirstPage ? pageHFirst : pageHRest;
-      if(currentGroup.length > 0 && currentH + segH > limit){
-        pages.push({ group: currentGroup, first: onFirstPage });
-        onFirstPage = false;
+      if(currentGroup.length > 0 && currentH + segH > pageHLimit){
+        pages.push(currentGroup);
         currentGroup = [seg];
         currentH = segH;
       } else {
@@ -1973,31 +1956,26 @@ async function doExportPDF(){
         currentH += segH;
       }
     }
-    if(currentGroup.length > 0) pages.push({ group: currentGroup, first: onFirstPage });
+    if(currentGroup.length > 0) pages.push(currentGroup);
 
     // Render each page
     for(let pi = 0; pi < pages.length; pi++){
-      const { group, first } = pages[pi];
+      const group = pages[pi];
       const groupTop = group[0].top;
       const groupBottom = group[group.length - 1].bottom;
       const groupH = groupBottom - groupTop;
 
-      // For pages 2+: prepend the thead strip
-      const extraH = first ? 0 : theadCoords.h;
       const pageCanvas = document.createElement('canvas');
       pageCanvas.width = canvasW;
-      pageCanvas.height = groupH + extraH;
+      pageCanvas.height = groupH;
       const ctx = pageCanvas.getContext('2d');
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvasW, groupH + extraH);
-      if(!first){
-        ctx.drawImage(theadCanvas, 0, 0, canvasW, theadCoords.h);
-      }
-      ctx.drawImage(fullCanvas, 0, groupTop, canvasW, groupH, 0, extraH, canvasW, groupH);
+      ctx.fillRect(0, 0, canvasW, groupH);
+      ctx.drawImage(fullCanvas, 0, groupTop, canvasW, groupH, 0, 0, canvasW, groupH);
 
       const imgData = pageCanvas.toDataURL('image/jpeg', 0.93);
       if(pi > 0) pdf.addPage();
-      const renderedH = (groupH + extraH) * pdfContentRatio;
+      const renderedH = groupH * pdfContentRatio;
       pdf.addImage(imgData, 'JPEG', MARGIN, MARGIN, contentW, renderedH);
     }
 

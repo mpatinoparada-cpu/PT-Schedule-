@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Purple Tie — Schedule Management</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzIiIGZpbGw9IiM2ZDI4ZDkiLz48cG9seWdvbiBwb2ludHM9IjMyLDEyIDM4LDI0IDM1LDI0IDM3LDQ0IDMyLDUwIDI3LDQ0IDI5LDI0IDI2LDI0IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=="/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Jost:wght@300;400;500&family=DM+Mono:wght@400;500&family=Lining+Nums&display=swap" rel="stylesheet"/>
 <style>
@@ -219,10 +221,7 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
     </div>
   </div>
   <div class="header-actions">
-    <button class="btn" id="grid-mode-btn" onclick="toggleGridMode()" title="Toggle grid view">
-      <svg id="grid-mode-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-      <span id="grid-mode-label">Full Cell</span>
-    </button>
+
     <button class="btn" onclick="manageEmployees()">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>Employees</span>
@@ -234,6 +233,10 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
     <button class="btn" onclick="doPrint()">
       <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       <span>Print</span>
+    </button>
+    <button class="btn" id="pdf-btn" onclick="doExportPDF()" style="background:#f0fdf4;border-color:#86efac;color:#166534;">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      <span id="pdf-btn-label">Export PDF</span>
     </button>
     <button class="btn" onclick="openDateRangeModal()" style="background:#fee2e2;border-color:#fca5a5;color:#dc2626;" title="Day Off by date range">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1730,6 +1733,300 @@ document.getElementById('new-emp').addEventListener('keydown',e=>{if(e.key==='En
   const syncFromUrl = params.get('sync');
   if(syncFromUrl && syncFromUrl.trim()) localStorage.setItem(getSyncKey(), syncFromUrl.trim());
 })();
+
+async function doExportPDF(){
+  const btn = document.getElementById('pdf-btn');
+  const label = document.getElementById('pdf-btn-label');
+  btn.disabled = true;
+  label.textContent = 'Generating…';
+
+  try {
+    // Build the same print HTML as doPrint() but return it as a string
+    const dates = getWeekDates(weekOffset);
+    const ti = todayIdx();
+
+    let cols = '<col style="width:150px"/>' + DAYS.map(()=>'<col style="min-width:110px"/>').join('');
+    let headerCols = '<th style="text-align:left;padding:10px 14px;background:#5b21b6;color:#fff;font-family:Jost,sans-serif;font-size:12px;letter-spacing:0.06em;">Employee</th>';
+    dates.forEach((d,di)=>{
+      const isToday = di===ti && weekOffset===0;
+      const bg = isToday ? '#8b5cf6' : '#6d28d9';
+      headerCols += `<th style="padding:10px 8px;background:${bg};color:#fff;font-family:Jost,sans-serif;font-size:12px;letter-spacing:0.06em;text-align:center;border-right:1px solid rgba(255,255,255,0.3);">
+        <div>${DAYS[di]}</div><div style="font-size:10px;opacity:0.85;margin-top:2px;font-family:'Calibri','Carlito',sans-serif;">${fmtDate(d)}</div>
+      </th>`;
+    });
+
+    let bodyRows = '';
+    if(!data.employees.length){
+      bodyRows = '<tr><td colspan="8" style="padding:32px;text-align:center;color:#7c6fa0;font-size:13px;">No employees.</td></tr>';
+    } else {
+      data.employees.forEach((emp,ei)=>{
+        const pal = EMP_PALETTES[ei%EMP_PALETTES.length];
+        const hrs = data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
+        const ini = emp.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        let cells = `<td style="padding:10px 14px;background:${pal.bg};border-right:2px solid ${pal.border};">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:34px;height:34px;border-radius:50%;background:${pal.bg};color:${pal.text};border:2px solid ${pal.border};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;font-family:'Calibri','Carlito',sans-serif;flex-shrink:0">${ini}</div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:${pal.text};font-family:Jost,sans-serif;">${emp.split(' ')[0]}</div>
+              <div style="font-size:10px;color:${pal.text};opacity:0.7;font-family:'Calibri','Carlito',sans-serif;">${hrs}h/week</div>
+            </div>
+          </div>
+        </td>`;
+        dates.forEach((d,di)=>{
+          const isToday = di===ti && weekOffset===0;
+          const rowBg = isToday ? '#f5f0ff' : '#ffffff';
+          const dayShifts = data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===weekOffset).sort((a,b)=>a.startH-b.startH);
+          const fullWidthShifts = dayShifts.filter(s=>(s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true);
+          const normalShifts = dayShifts.filter(s=>!((s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true));
+          const amShifts = normalShifts.filter(s=>s.startH<12);
+          const pmShifts = normalShifts.filter(s=>s.startH>=12);
+
+          function shiftBlock(s){
+            if(s.dayOff) return `<div style="border-radius:6px;padding:6px 4px;background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;font-size:9px;font-weight:700;text-align:center;font-family:Jost,sans-serif;width:100%;">${s.note||'Day Off'}</div>`;
+            return `<div style="border-radius:6px;padding:4px 6px;background:${pal.bg};border:1px solid ${pal.border};color:${pal.text};margin-bottom:2px;">
+              <div style="font-size:14px;font-weight:600;font-family:'Calibri','Carlito',sans-serif;">${fmtH(s.startH)}–${fmtH(s.endH)}</div>
+              ${s.note?`<div style="font-size:8px;margin-top:1px;opacity:0.8;font-family:Jost,sans-serif;">${s.note}</div>`:''}
+            </div>`;
+          }
+
+          let cellContent;
+          if(fullWidthShifts.length>0){
+            cellContent = `<div style="padding:3px;height:100%;">${fullWidthShifts.map(s=>shiftBlock(s)).join('')}</div>`;
+          } else {
+            cellContent = `<div style="display:grid;grid-template-columns:1fr 1fr;height:100%;gap:0;">
+              <div style="padding:3px;border-right:1px dashed #e0d9f7;vertical-align:top;">
+                <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">AM</div>
+                ${amShifts.map(s=>shiftBlock(s)).join('')}
+              </div>
+              <div style="padding:3px;vertical-align:top;">
+                <div style="font-size:7px;font-weight:700;letter-spacing:0.1em;color:#7c6fa0;text-align:center;margin-bottom:2px;">PM</div>
+                ${pmShifts.map(s=>shiftBlock(s)).join('')}
+              </div>
+            </div>`;
+          }
+          cells += `<td style="padding:0;border-right:1px solid #e0d9f7;border-bottom:1px solid #e0d9f7;min-height:60px;vertical-align:top;background:${rowBg};">${cellContent}</td>`;
+        });
+        bodyRows += `<tr>${cells}</tr>`;
+      });
+    }
+
+    const legendHtml = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">' +
+      data.employees.map((emp,i)=>{
+        const pal = EMP_PALETTES[i%EMP_PALETTES.length];
+        return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7c6fa0;font-family:Jost,sans-serif;">
+          <div style="width:12px;height:12px;border-radius:50%;background:${pal.dot};"></div>${emp}
+        </div>`;
+      }).join('') + '</div>';
+
+    const htmlContent = `<!DOCTYPE html><html><head>
+      <meta charset="UTF-8"/>
+      <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Jost',sans-serif;background:#fff;color:#1e1340;padding:24px;width:1100px;}
+        table{border-collapse:collapse;width:100%;}
+        td,th{border:1px solid #e0d9f7;}
+      </style>
+    </head><body>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:3px solid #6d28d9;">
+        <div>
+          <div style="font-style:italic;font-size:28px;font-weight:500;color:#6d28d9;font-family:Georgia,serif;">Purple <span style="color:#7c6fa0">Tie</span></div>
+          <div style="font-size:10px;color:#7c6fa0;margin-top:2px;letter-spacing:0.08em;text-transform:uppercase;font-family:Jost,sans-serif;">Supervisors' Schedule</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:500;color:#1e1340;font-family:Jost,sans-serif;">${data.name||'Schedule'}</div>
+          <div style="font-size:11px;color:#7c6fa0;margin-top:3px;font-family:'Calibri','Carlito',sans-serif;">${fmtDate(dates[0])} – ${fmtDate(dates[6])}</div>
+        </div>
+      </div>
+      ${legendHtml}
+      <div style="border-radius:12px;border:1px solid #e0d9f7;overflow:hidden;">
+        <table>
+          <colgroup>${cols}</colgroup>
+          <thead><tr>${headerCols}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px;font-size:10px;color:#7c6fa0;text-align:right;font-family:Jost,sans-serif;">
+        Printed on ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+      </div>
+    </body></html>`;
+
+    // Render in hidden iframe — tall enough to fit everything without scrolling
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1150px;height:6000px;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(htmlContent);
+    iframe.contentDocument.close();
+
+    // Wait for fonts/layout to settle
+    await new Promise(r => setTimeout(r, 1400));
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'landscape', unit:'px', format:'a4', compress:true });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+
+    // Capture full page as one high-res canvas
+    const fullCanvas = await html2canvas(iframe.contentDocument.body, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 1150,
+      windowWidth: 1150,
+      scrollY: 0
+    });
+    document.body.removeChild(iframe);
+
+    const scale = 2; // matches html2canvas scale above
+    const canvasW = fullCanvas.width;   // px at 2x
+    const pdfRatio = pdfW / canvasW;    // how canvas maps to PDF points
+
+    // Measure each table row's position in the full canvas
+    // We do this by re-parsing bodyRows to count rows and computing heights
+    // Strategy: scan the canvas top-to-bottom and find row boundaries by
+    // measuring the header block height + each row height from the iframe DOM.
+
+    // Re-open an iframe just for measurements (no visual)
+    const mframe = document.createElement('iframe');
+    mframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1150px;height:6000px;border:none;visibility:hidden;';
+    document.body.appendChild(mframe);
+    mframe.contentDocument.open();
+    mframe.contentDocument.write(htmlContent);
+    mframe.contentDocument.close();
+    await new Promise(r => setTimeout(r, 600));
+
+    // Collect row top/bottom positions in pixel (device) coords
+    const tableRows = mframe.contentDocument.querySelectorAll('table tbody tr');
+    const tableHeader = mframe.contentDocument.querySelector('table thead');
+    const headerSection = mframe.contentDocument.querySelector('body > div:first-child'); // title bar
+    const legendDiv = mframe.contentDocument.querySelector('body > div:nth-child(2)');    // legend
+
+    // Get bounding rects relative to document top
+    function docTop(el){ 
+      let t = 0; 
+      while(el){ t += el.offsetTop; el = el.offsetParent; } 
+      return t; 
+    }
+
+    // Build list of segments: {top, bottom} in canvas pixels (2x scale)
+    // Each segment = one table row (they must not be cut)
+    const segments = [];
+
+    // Segment 0: everything above the first tbody row (header+legend+thead)
+    const firstRowTop = tableRows.length > 0 ? docTop(tableRows[0]) * scale : fullCanvas.height;
+    segments.push({ top: 0, bottom: firstRowTop });
+
+    // One segment per tbody row
+    tableRows.forEach((tr, i) => {
+      const top = docTop(tr) * scale;
+      const bottom = top + tr.offsetHeight * scale;
+      segments.push({ top, bottom });
+    });
+
+    // Segment for footer (after last row)
+    if(tableRows.length > 0){
+      const lastRow = tableRows[tableRows.length - 1];
+      const footerTop = (docTop(lastRow) + lastRow.offsetHeight) * scale;
+      if(footerTop < fullCanvas.height){
+        segments.push({ top: footerTop, bottom: fullCanvas.height });
+      }
+    }
+
+    // Also capture thead as its own strip to repeat on subsequent pages
+    const theadEl = mframe.contentDocument.querySelector('table thead');
+    const theadTop = docTop(theadEl) * scale;
+    const theadH = theadEl.offsetHeight * scale;
+    const theadCoords = { top: theadTop, h: theadH };
+
+    document.body.removeChild(mframe);
+
+    // Draw thead strip from fullCanvas into its own canvas
+    const theadCanvas = document.createElement('canvas');
+    theadCanvas.width = canvasW;
+    theadCanvas.height = theadH;
+    theadCanvas.getContext('2d').drawImage(fullCanvas, 0, theadCoords.top, canvasW, theadCoords.h, 0, 0, canvasW, theadCoords.h);
+
+    // Margin in PDF points applied on all 4 sides
+    const MARGIN = 24;
+    const contentW = pdfW - MARGIN * 2;
+    const contentH = pdfH - MARGIN * 2;
+    const pdfContentRatio = contentW / canvasW;
+    const theadPdfH = theadCoords.h * pdfContentRatio;
+
+    // Max canvas-px that fit vertically per page
+    const pageHFirst = contentH / pdfContentRatio;
+    const pageHRest  = (contentH - theadPdfH) / pdfContentRatio; // leave room for repeated header
+
+    // Merge tiny footer segment into the last data row so it never lands alone on a page
+    if(segments.length > 1){
+      const last = segments[segments.length - 1];
+      const secondLast = segments[segments.length - 2];
+      if((last.bottom - last.top) < 60 * scale){
+        segments[segments.length - 2] = { top: secondLast.top, bottom: last.bottom };
+        segments.pop();
+      }
+    }
+
+    // Group segments into pages
+    const pages = [];
+    let currentGroup = [];
+    let currentH = 0;
+    let onFirstPage = true;
+
+    for(const seg of segments){
+      const segH = seg.bottom - seg.top;
+      const limit = onFirstPage ? pageHFirst : pageHRest;
+      if(currentGroup.length > 0 && currentH + segH > limit){
+        pages.push({ group: currentGroup, first: onFirstPage });
+        onFirstPage = false;
+        currentGroup = [seg];
+        currentH = segH;
+      } else {
+        currentGroup.push(seg);
+        currentH += segH;
+      }
+    }
+    if(currentGroup.length > 0) pages.push({ group: currentGroup, first: onFirstPage });
+
+    // Render each page
+    for(let pi = 0; pi < pages.length; pi++){
+      const { group, first } = pages[pi];
+      const groupTop = group[0].top;
+      const groupBottom = group[group.length - 1].bottom;
+      const groupH = groupBottom - groupTop;
+
+      // For pages 2+: prepend the thead strip
+      const extraH = first ? 0 : theadCoords.h;
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvasW;
+      pageCanvas.height = groupH + extraH;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasW, groupH + extraH);
+      if(!first){
+        ctx.drawImage(theadCanvas, 0, 0, canvasW, theadCoords.h);
+      }
+      ctx.drawImage(fullCanvas, 0, groupTop, canvasW, groupH, 0, extraH, canvasW, groupH);
+
+      const imgData = pageCanvas.toDataURL('image/jpeg', 0.93);
+      if(pi > 0) pdf.addPage();
+      const renderedH = (groupH + extraH) * pdfContentRatio;
+      pdf.addImage(imgData, 'JPEG', MARGIN, MARGIN, contentW, renderedH);
+    }
+
+    const safeName = (data.name||'schedule').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+    const weekStr = fmtDate(dates[0]).replace(/\//g,'-');
+    pdf.save(`purple_tie_${safeName}_${weekStr}.pdf`);
+    showNotify('PDF downloaded ✓');
+  } catch(err){
+    console.error(err);
+    alert('Error generating PDF. Try using Print → Save as PDF instead.');
+  } finally {
+    btn.disabled = false;
+    label.textContent = 'Export PDF';
+  }
+}
 
 renderAll();
 // On load: sync once from cloud if we have a key, then keep auto-polling

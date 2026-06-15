@@ -461,8 +461,12 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
   <div class="modal" style="width:min(520px,92vw)">
     <h3>Manage employees</h3>
     <div id="emp-list" style="margin-bottom:14px;max-height:360px;overflow-y:auto"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="new-emp" placeholder="Employee name" style="flex:1;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:18px;outline:none"/>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="new-emp" placeholder="Employee name" style="flex:1;min-width:140px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:18px;outline:none"/>
+      <select id="new-emp-cat" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;">
+        <option value="floor">🏢 Floor</option>
+        <option value="kitchen">🍳 Kitchen</option>
+      </select>
       <button class="btn btn-accent btn-sm" onclick="addEmployee()">
         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar
       </button>
@@ -520,6 +524,14 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
 
 <script>
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+// Migrate employees: if stored as plain strings, convert to objects
+function migrateEmployees(arr){
+  return (arr||[]).map(e => typeof e === 'string' ? {name:e, cat:'floor'} : e);
+}
+function empName(e){ return typeof e === 'string' ? e : e.name; }
+function empCat(e){ return (typeof e === 'string' ? 'floor' : e.cat) || 'floor'; }
+
 const START_H = 0, END_H = 30;
 const HOURS_LIST = [];
 for (let h = START_H; h <= END_H; h++) {
@@ -600,7 +612,11 @@ function getSyncKey(){ return SECTIONS[currentSection].syncKey; }
 function loadLocalData(){
   try {
     const saved = localStorage.getItem(getLocalKey());
-    if(saved) return JSON.parse(saved);
+    if(saved){
+      const d = JSON.parse(saved);
+      d.employees = migrateEmployees(d.employees);
+      return d;
+    }
   } catch(e){}
   return null;
 }
@@ -609,8 +625,8 @@ function getAutoWeekName(){
   return now.toLocaleDateString('en-US', {month:'long', year:'numeric'});
 }
 function defaultData(section){
-  if(section==='managers') return { name:getAutoWeekName(), employees:['Manager 1','Manager 2'], shifts:[] };
-  return { name:getAutoWeekName(), employees:['Ana Lopez','Carlos Ruiz','Maria Torres'], shifts:[] };
+  if(section==='managers') return { name:getAutoWeekName(), employees:[{name:'Manager 1',cat:'floor'},{name:'Manager 2',cat:'floor'}], shifts:[] };
+  return { name:getAutoWeekName(), employees:[{name:'Ana Lopez',cat:'floor'},{name:'Carlos Ruiz',cat:'floor'},{name:'Maria Torres',cat:'kitchen'}], shifts:[] };
 }
 let data = loadLocalData() || defaultData(currentSection);
 let shareKey=null, pollTimer=null, weekOffset=0, editingIdx=null;
@@ -646,6 +662,7 @@ function switchSection(section){
   document.getElementById('switcher-label').textContent = secInfo.label;
   // Load data for new section
   data = loadLocalData() || defaultData(section);
+  data.employees = migrateEmployees(data.employees);
   // Update URL with correct sync ID for this section
   const newSyncId = localStorage.getItem(getSyncKey());
   if(newSyncId && window.history.replaceState){
@@ -667,7 +684,7 @@ function switchSection(section){
 }
 
 function palette(emp) {
-  const i = data.employees.indexOf(emp);
+  const i = data.employees.findIndex(e=>empName(e)===emp);
   return EMP_PALETTES[(i>=0?i:0) % EMP_PALETTES.length];
 }
 function setStatus(msg,ok=true) {
@@ -695,7 +712,7 @@ function renderMetrics() {
   // Overtime calculation
   let totalOT=0;
   let otEmps=[];
-  data.employees.forEach(emp=>{
+  data.employees.forEach(empObj=>{const emp=empName(empObj);
     const hrs=getEmpHours(emp);
     if(hrs>OT_LIMIT){ totalOT+=(hrs-OT_LIMIT); otEmps.push(emp.split(' ')[0]+': +'+(hrs-OT_LIMIT)+'h'); }
   });
@@ -718,7 +735,8 @@ function renderAvail() {
   const el=document.getElementById('avail-chips');
   el.innerHTML='';
   if(!data.employees.length){el.innerHTML='<span style="font-size:16.5px;color:var(--muted)">No employees yet.</span>';return;}
-  data.employees.forEach((emp,i)=>{
+  data.employees.forEach((empObj,i)=>{
+    const emp=empName(empObj);
     const pal=EMP_PALETTES[i%EMP_PALETTES.length];
     const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===ti&&s.week===weekOffset&&!s.dayOff).sort((a,b)=>a.startH-b.startH);
     const on=dayShifts.length>0;
@@ -736,7 +754,8 @@ function renderAvail() {
 function renderLegend() {
   const el=document.getElementById('legend');
   el.innerHTML='';
-  data.employees.forEach((emp,i)=>{
+  data.employees.forEach((empObj,i)=>{
+    const emp=empName(empObj);
     const pal=EMP_PALETTES[i%EMP_PALETTES.length];
     const d=document.createElement('div');
     d.className='leg-item';
@@ -782,7 +801,12 @@ function renderGrid() {
     return;
   }
 
-  data.employees.forEach((emp,ei)=>{
+  // Group employees by category with a divider row between groups
+  const floorEmps = data.employees.map((e,i)=>({e,i})).filter(({e})=>empCat(e)==='floor');
+  const kitchenEmps = data.employees.map((e,i)=>({e,i})).filter(({e})=>empCat(e)==='kitchen');
+
+  function renderEmpRow(empObj, ei){
+    const emp = empName(empObj);
     const pal=EMP_PALETTES[ei%EMP_PALETTES.length];
     const tr=tbody.insertRow();
 
@@ -955,7 +979,23 @@ function renderGrid() {
       }
       } // end else normal
     });
-  });
+  } // end renderEmpRow
+
+  // Render floor supervisors
+  floorEmps.forEach(({e,i}) => renderEmpRow(e, i));
+
+  // Divider row between categories (only if both groups have employees)
+  if(floorEmps.length > 0 && kitchenEmps.length > 0){
+    const divTr = tbody.insertRow();
+    divTr.style.cssText = 'pointer-events:none;';
+    const divTd = divTr.insertCell();
+    divTd.colSpan = 8;
+    divTd.style.cssText = 'padding:0;border:none;';
+    divTd.innerHTML = `<div style="border-top:3px solid var(--accent);margin:0;"></div>`;
+  }
+
+  // Render kitchen supervisors
+  kitchenEmps.forEach(({e,i}) => renderEmpRow(e, i));
 }
 
 async function pushToCloud(){
@@ -1149,7 +1189,7 @@ function openModal(dayIdx, emp, shIdx, defaultStart) {
   document.getElementById('modal-title').textContent=sh?`Edit shift — ${emp.split(' ')[0]}`:`Assign shift — ${emp.split(' ')[0]}`;
 
   const empSel=document.getElementById('m-emp');
-  empSel.innerHTML=data.employees.map(e=>`<option value="${e}" ${e===emp?'selected':''}>${e}</option>`).join('');
+  empSel.innerHTML=data.employees.map(e=>`<option value="${empName(e)}" ${empName(e)===emp?'selected':''}>${empName(e)}</option>`).join('');
 
   const daySel=document.getElementById('m-day');
   daySel.innerHTML=DAYS.map((d,i)=>`<option value="${i}" ${i===dayIdx?'selected':''}>${d}</option>`).join('');
@@ -1190,7 +1230,7 @@ function assignDayOff(){ selectType('Day Off'); }
 // ── Date Range Day Off ──
 function openDateRangeModal(){
   const empSel = document.getElementById('dr-emp');
-  empSel.innerHTML = data.employees.map(e=>`<option value="${e}">${e}</option>`).join('');
+  empSel.innerHTML = data.employees.map(e=>`<option value="${empName(e)}">${empName(e)}</option>`).join('');
   // default dates to today
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('dr-from').value = today;
@@ -1321,16 +1361,22 @@ function manageEmployees(){renderEmpList();document.getElementById('emp-overlay'
 function closeEmpModal(){document.getElementById('emp-overlay').classList.add('hidden');renderAll();cloudSave();}
 function renderEmpList(){
   document.getElementById('emp-list').innerHTML=data.employees.length
-    ?data.employees.map((e,i)=>{
+    ?data.employees.map((empObj,i)=>{
+      const e=empName(empObj); const cat=empCat(empObj);
       const pal=EMP_PALETTES[i%EMP_PALETTES.length];
-      const safe=e.replace(/'/g,"\\'");
-      return `<div class="emp-row" id="emprow-${i}">
+      const safe=e.replace(/'/g,"\'");
+      return `<div class="emp-row" id="emprow-${i}" style="align-items:center;">
         <div class="avatar" style="width:28px;height:28px;font-size:15px;background:${pal.bg};color:${pal.text};border:1px solid ${pal.border};flex-shrink:0">${initials(e)}</div>
         <span id="empname-${i}" style="flex:1;font-size:16px;padding:4px;">${e}</span>
         <input type="text" id="empinput-${i}" value="${e.replace(/"/g,'&quot;')}"
           style="flex:1;font-size:16px;border:1px solid var(--accent);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--text);outline:none;display:none;"
           onkeydown="if(event.key==='Enter')saveEmpName(${i},'${safe}');if(event.key==='Escape')cancelEmpEdit(${i})"
         />
+        <select id="catsel-${i}" onchange="changeEmpCat(${i},'${safe}')"
+          style="font-size:13px;border:1px solid var(--border2);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--text);outline:none;">
+          <option value="floor" ${cat==='floor'?'selected':''}>🏢 Floor</option>
+          <option value="kitchen" ${cat==='kitchen'?'selected':''}>🍳 Kitchen</option>
+        </select>
         <button class="btn btn-sm" id="editbtn-${i}"
           style="background:var(--accent-light);color:var(--accent);border-color:var(--accent);padding:4px 8px;"
           onclick="startEmpEdit(${i})" title="Edit">✏️</button>
@@ -1364,9 +1410,10 @@ function saveEmpName(i, oldName){
 
 function addEmployee(){
   const name=document.getElementById('new-emp').value.trim();
-  if(!name||data.employees.includes(name))return;
+  const cat=document.getElementById('new-emp-cat').value||'floor';
+  if(!name||data.employees.some(e=>empName(e)===name))return;
   if(data.employees.length>=20){showNotify('Maximum 20 employees.');return;}
-  data.employees.push(name);
+  data.employees.push({name, cat});
   document.getElementById('new-emp').value='';
   renderEmpList();
   cloudSave();
@@ -1375,20 +1422,29 @@ function addEmployee(){
 function renameEmployee(oldName, newName){
   newName = newName.trim();
   if(!newName || newName === oldName) return;
-  if(data.employees.includes(newName)){
+  if(data.employees.some(e=>empName(e)===newName)){
     showNotify('That name already exists.');
     renderEmpList();
     return;
   }
-  data.employees = data.employees.map(e => e===oldName ? newName : e);
+  data.employees = data.employees.map(e => empName(e)===oldName ? {...(typeof e==='object'?e:{name:e,cat:'floor'}), name:newName} : e);
   data.shifts = data.shifts.map(s => s.emp===oldName ? {...s, emp:newName} : s);
   renderEmpList();
   cloudSave();
   setStatus('Name updated ✓');
 }
+function changeEmpCat(i, oldName){
+  const cat = document.getElementById('catsel-'+i).value;
+  const idx = data.employees.findIndex(e=>empName(e)===oldName);
+  if(idx<0)return;
+  const e = data.employees[idx];
+  data.employees[idx] = {...(typeof e==='object'?e:{name:oldName,cat:'floor'}), cat};
+  cloudSave();
+  renderAll();
+}
 function removeEmployee(name){
   if(!confirm(`¿Eliminar a ${name} y todos sus turnos?`))return;
-  data.employees=data.employees.filter(e=>e!==name);
+  data.employees=data.employees.filter(e=>empName(e)!==name);
   data.shifts=data.shifts.filter(s=>s.emp!==name);
   renderEmpList();
   cloudSave();
@@ -1517,7 +1573,7 @@ function sendShareEmail(){
     link + '\n\n' +
     'The schedule loads automatically — all changes sync in real time.\n\n' +
     'Schedule name: ' + (data.name || 'Purple Tie Schedule') + '\n' +
-    'Employees: ' + data.employees.join(', ') + '\n\n' +
+    'Employees: ' + data.employees.map(empName).join(', ') + '\n\n' +
     '— Sent from Purple Tie Schedule Manager'
   );
   window.location.href = `mailto:${allTo}?subject=${subject}&body=${body}`;
@@ -1589,7 +1645,8 @@ function doPrint(){
   if(!data.employees.length){
     bodyRows='<tr><td colspan="8" style="padding:32px;text-align:center;color:#7c6fa0;font-size:13px;">No employees.</td></tr>';
   } else {
-    data.employees.forEach((emp,ei)=>{
+    data.employees.forEach((empObj,ei)=>{
+      const emp=empName(empObj);
       const pal=EMP_PALETTES[ei%EMP_PALETTES.length];
       const hrs=data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
       const ini=emp.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1660,7 +1717,8 @@ function doPrint(){
   const metricsHtml=``;
 
   const legendHtml='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
-    data.employees.map((emp,i)=>{
+    data.employees.map((empObj,i)=>{
+      const emp=empName(empObj);
       const pal=EMP_PALETTES[i%EMP_PALETTES.length];
       return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7c6fa0;font-family:Jost,sans-serif;">
         <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;width:12px;height:12px;border-radius:50%;background:${pal.dot} !important;"></div>${emp}
@@ -1759,7 +1817,8 @@ async function doExportPDF(){
     if(!data.employees.length){
       bodyRows = '<tr><td colspan="8" style="padding:32px;text-align:center;color:#7c6fa0;font-size:13px;">No employees.</td></tr>';
     } else {
-      data.employees.forEach((emp,ei)=>{
+      data.employees.forEach((empObj,ei)=>{
+        const emp=empName(empObj);
         const pal = EMP_PALETTES[ei%EMP_PALETTES.length];
         const hrs = data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
         const ini = emp.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1811,7 +1870,8 @@ async function doExportPDF(){
     }
 
     const legendHtml = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">' +
-      data.employees.map((emp,i)=>{
+      data.employees.map((empObj,i)=>{
+        const emp=empName(empObj);
         const pal = EMP_PALETTES[i%EMP_PALETTES.length];
         return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#7c6fa0;font-family:Jost,sans-serif;">
           <div style="width:12px;height:12px;border-radius:50%;background:${pal.dot};"></div>${emp}
@@ -1863,9 +1923,10 @@ async function doExportPDF(){
     await new Promise(r => setTimeout(r, 1400));
 
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation:'landscape', unit:'px', format:'a4', compress:true });
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = pdf.internal.pageSize.getHeight();
+    // Use pt units — A4 landscape = 841.89 x 595.28 pt
+    const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4', compress:true });
+    const pdfW = pdf.internal.pageSize.getWidth();   // ~841.89 pt
+    const pdfH = pdf.internal.pageSize.getHeight();  // ~595.28 pt
 
     // Capture full page as one high-res canvas
     const fullCanvas = await html2canvas(iframe.contentDocument.body, {
@@ -1879,8 +1940,8 @@ async function doExportPDF(){
     document.body.removeChild(iframe);
 
     const scale = 2; // matches html2canvas scale above
-    const canvasW = fullCanvas.width;   // px at 2x
-    const pdfRatio = pdfW / canvasW;    // how canvas maps to PDF points
+    const canvasW = fullCanvas.width;   // px at 2x (= 1150 * 2 = 2300)
+    const canvasH = fullCanvas.height;
 
     // Measure each table row's position in the full canvas
     // We do this by re-parsing bodyRows to count rows and computing heights
@@ -1931,16 +1992,17 @@ async function doExportPDF(){
 
     document.body.removeChild(mframe);
 
-    // Margin in PDF points applied on all 4 sides
-    const MARGIN = 24;
-    const contentW = pdfW - MARGIN * 2;
-    const contentH = pdfH - MARGIN * 2;
-    const pdfContentRatio = contentW / canvasW;
+    // Margin in PDF points (pt)
+    const MARGIN = 18; // pt
+    const contentW_pt = pdfW - MARGIN * 2;
+    const contentH_pt = pdfH - MARGIN * 2;
 
-    // Max canvas-px that fit vertically per page (same limit for all pages)
-    const pageHLimit = contentH / pdfContentRatio;
+    // Scale: how many canvas-px fit per PDF pt
+    // canvas is rendered at 2x of 1150px wide -> canvasW = 2300px maps to contentW_pt
+    const pxPerPt = canvasW / contentW_pt;        // canvas-px per PDF pt
+    const pageHLimit = contentH_pt * pxPerPt;     // max canvas-px tall per page
 
-    // Group segments into pages
+    // Group segments into pages — never split a row across pages
     const pages = [];
     let currentGroup = [];
     let currentH = 0;
@@ -1975,8 +2037,9 @@ async function doExportPDF(){
 
       const imgData = pageCanvas.toDataURL('image/jpeg', 0.93);
       if(pi > 0) pdf.addPage();
-      const renderedH = groupH * pdfContentRatio;
-      pdf.addImage(imgData, 'JPEG', MARGIN, MARGIN, contentW, renderedH);
+      // Convert canvas-px group height back to PDF pt
+      const renderedH_pt = groupH / pxPerPt;
+      pdf.addImage(imgData, 'JPEG', MARGIN, MARGIN, contentW_pt, renderedH_pt);
     }
 
     const safeName = (data.name||'schedule').replace(/[^a-z0-9]/gi,'_').toLowerCase();

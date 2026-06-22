@@ -530,6 +530,25 @@ const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sun
 function migrateEmployees(arr){
   return (arr||[]).map(e => typeof e === 'string' ? {name:e, cat:'floor'} : e);
 }
+// Migrate old numeric week offsets to YYYY-MM-DD keys
+function migrateWeekKeys(shifts){
+  if(!shifts || !shifts.length) return shifts;
+  const now = new Date();
+  const todayMon = new Date(now);
+  todayMon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  todayMon.setHours(0,0,0,0);
+  return shifts.map(s => {
+    if(typeof s.week === 'number'){
+      const mon = new Date(todayMon);
+      mon.setDate(todayMon.getDate() + s.week * 7);
+      const key = mon.getFullYear() + '-' +
+        String(mon.getMonth()+1).padStart(2,'0') + '-' +
+        String(mon.getDate()).padStart(2,'0');
+      return {...s, week: key};
+    }
+    return s;
+  });
+}
 function empName(e){ return typeof e === 'string' ? e : e.name; }
 function empCat(e){ return (typeof e === 'string' ? 'floor' : e.cat) || 'floor'; }
 
@@ -595,6 +614,14 @@ function getWeekDates(off) {
   return Array.from({length:7}, (_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 }
 function fmtDate(d) { return d.toLocaleDateString('en',{day:'numeric',month:'short'}); }
+// Returns a stable YYYY-MM-DD key for the Monday of the given week offset
+function getWeekKey(off) {
+  const dates = getWeekDates(off);
+  const mon = dates[0];
+  return mon.getFullYear() + '-' +
+    String(mon.getMonth()+1).padStart(2,'0') + '-' +
+    String(mon.getDate()).padStart(2,'0');
+}
 function initials(n) { return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
 // Firebase config
@@ -616,6 +643,7 @@ function loadLocalData(){
     if(saved){
       const d = JSON.parse(saved);
       d.employees = migrateEmployees(d.employees);
+      d.shifts = migrateWeekKeys(d.shifts || []);
       return d;
     }
   } catch(e){}
@@ -701,11 +729,11 @@ function showNotify(msg) {
 }
 
 const OT_LIMIT = 40;
-function getEmpHours(emp){ return data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0); }
+function getEmpHours(emp){ const wk=getWeekKey(weekOffset); return data.shifts.filter(s=>s.emp===emp&&s.week===wk).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0); }
 function renderMetrics() {
   const ti=todayIdx();
   let working=0, total=0;
-  const ws=data.shifts.filter(s=>s.week===weekOffset);
+  const ws=data.shifts.filter(s=>s.week===getWeekKey(weekOffset));
   ws.forEach(s=>{total++;if(s.day===ti)working++;});
   const maxSlots=data.employees.length*7;
   const pct=maxSlots>0?Math.round(total/maxSlots*100):0;
@@ -740,7 +768,7 @@ function renderAvail() {
   data.employees.forEach((empObj,i)=>{
     const emp=empName(empObj);
     const pal=EMP_PALETTES[i%EMP_PALETTES.length];
-    const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===ti&&s.week===weekOffset&&!s.dayOff).sort((a,b)=>a.startH-b.startH);
+    const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===ti&&s.week===getWeekKey(weekOffset)&&!s.dayOff).sort((a,b)=>a.startH-b.startH);
     const on=dayShifts.length>0;
     const shiftLabel=on?dayShifts.map(s=>fmtH(s.startH)+'–'+fmtH(s.endH)).join(', '):'No shift';
     const chip=document.createElement('div');
@@ -835,7 +863,7 @@ function renderGrid() {
       // Check if this day has a full-day (range) day off
       const SPECIAL_TYPES=['Day Off','Sick','Without Pay','Unavailable'];
       const rangeDayOff = data.shifts.find(s=>
-        s.emp===emp && s.day===di && s.week===weekOffset &&
+        s.emp===emp && s.day===di && s.week===getWeekKey(weekOffset) &&
         s.dayOff && s.startH===0 && s.endH===24
       );
 
@@ -868,7 +896,7 @@ function renderGrid() {
           wrapper.style.cssText='display:flex;flex-direction:column;gap:2px;padding:3px;height:100%;min-height:70px;';
           const allShifts=data.shifts
             .map((s,idx)=>({s,idx}))
-            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset)
+            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===getWeekKey(weekOffset))
             .sort((a,b)=>a.s.startH-b.s.startH);
 
           allShifts.forEach(({s,idx})=>{
@@ -903,7 +931,7 @@ function renderGrid() {
           // Check if there's a shift that spans both AM and PM
           const fullDayShifts = data.shifts
             .map((s,idx)=>({s,idx}))
-            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===weekOffset&&s.fullDay===true)
+            .filter(({s})=>s.emp===emp&&s.day===di&&s.week===getWeekKey(weekOffset)&&s.fullDay===true)
             .sort((a,b)=>a.s.startH-b.s.startH);
 
           if(fullDayShifts.length > 0){
@@ -1274,13 +1302,12 @@ function confirmDateRange(){
   // Iterate each day in the range and add a Day Off shift
   let added = 0;
   for(let d = new Date(d1); d <= d2; d.setDate(d.getDate()+1)){
-    // figure out which week offset this date falls on
-    const now = new Date();
-    const todayMon = new Date(now);
-    todayMon.setDate(now.getDate() - ((now.getDay()+6)%7));
-    todayMon.setHours(0,0,0,0);
-    const diffDays = Math.round((d - todayMon)/(1000*60*60*24));
-    const wk = Math.floor(diffDays/7);
+    // Get the Monday of this day's week as a YYYY-MM-DD key
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+    const wk = mon.getFullYear() + '-' +
+      String(mon.getMonth()+1).padStart(2,'0') + '-' +
+      String(mon.getDate()).padStart(2,'0');
     const dayIdx = ((d.getDay()+6)%7); // 0=Mon … 6=Sun
 
     // skip if already has a day-off on this slot
@@ -1321,15 +1348,15 @@ function confirmShift(){
   }
   // check for overlap only when adding new
   if(editingIdx===null){
-    const overlap=data.shifts.some(s=>s.emp===emp&&s.day===day&&s.week===weekOffset&&s.startH<endH&&s.endH>startH);
+    const overlap=data.shifts.some(s=>s.emp===emp&&s.day===day&&s.week===getWeekKey(weekOffset)&&s.startH<endH&&s.endH>startH);
     if(overlap){alert('This time overlaps with an existing shift. Please choose a different time.');return;}
   }
   const isSpecial = currentShiftType !== '';
   // if Full Day, remove any existing shifts in the same cell first
   if(modalFullDay){
-    data.shifts = data.shifts.filter(s=>!(s.emp===emp&&s.day===day&&s.week===weekOffset));
+    data.shifts = data.shifts.filter(s=>!(s.emp===emp&&s.day===day&&s.week===getWeekKey(weekOffset)));
   }
-  data.shifts.push({emp,day,week:weekOffset,startH,endH,
+  data.shifts.push({emp,day,week:getWeekKey(weekOffset),startH,endH,
     note: isSpecial ? currentShiftType : note,
     dayOff: isSpecial,
     shiftType: currentShiftType,
@@ -1514,6 +1541,8 @@ async function doRefresh(){
     if(!result) return;
     const prev=JSON.stringify(data.shifts);
     data=result;
+    data.employees = migrateEmployees(data.employees || []);
+    data.shifts = migrateWeekKeys(data.shifts || []);
     localStorage.setItem(getLocalKey(), JSON.stringify(data));
     document.getElementById('sched-name').value=data.name;
     renderAll();
@@ -1650,7 +1679,7 @@ function doPrint(){
     data.employees.forEach((empObj,ei)=>{
       const emp=empName(empObj);
       const pal=EMP_PALETTES[ei%EMP_PALETTES.length];
-      const hrs=data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
+      const hrs=data.shifts.filter(s=>s.emp===emp&&s.week===getWeekKey(weekOffset)).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
       const ini=emp.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
       let cells=`<td style="padding:10px 14px;background:${pal.bg} !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border-right:2px solid ${pal.border};">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1664,7 +1693,7 @@ function doPrint(){
       dates.forEach((d,di)=>{
         const isToday=di===ti&&weekOffset===0;
         const rowBg=isToday?'#f5f0ff':'#ffffff';
-        const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===weekOffset).sort((a,b)=>a.startH-b.startH);
+        const dayShifts=data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===getWeekKey(weekOffset)).sort((a,b)=>a.startH-b.startH);
 
         // Detect full-width shifts: dayOff range (startH=0,endH=24) or fullDay flag
         const fullWidthShifts = dayShifts.filter(s=>(s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true);
@@ -1711,7 +1740,7 @@ function doPrint(){
     });
   }
 
-  const ws=data.shifts.filter(s=>s.week===weekOffset);
+  const ws=data.shifts.filter(s=>s.week===getWeekKey(weekOffset));
   const working=ws.filter(s=>s.day===ti).length;
   const totalHrs=ws.reduce((a,s)=>a+(s.endH-s.startH),0);
   const pct=data.employees.length*7>0?Math.round(ws.length/(data.employees.length*7)*100):0;
@@ -1822,7 +1851,7 @@ async function doExportPDF(){
       data.employees.forEach((empObj,ei)=>{
         const emp=empName(empObj);
         const pal = EMP_PALETTES[ei%EMP_PALETTES.length];
-        const hrs = data.shifts.filter(s=>s.emp===emp&&s.week===weekOffset).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
+        const hrs = data.shifts.filter(s=>s.emp===emp&&s.week===getWeekKey(weekOffset)).reduce((a,s)=>a+(s.dayOff?0:s.endH-s.startH),0);
         const ini = emp.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
         let cells = `<td style="padding:10px 14px;background:${pal.bg};border-right:2px solid ${pal.border};">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -1836,7 +1865,7 @@ async function doExportPDF(){
         dates.forEach((d,di)=>{
           const isToday = di===ti && weekOffset===0;
           const rowBg = isToday ? '#f5f0ff' : '#ffffff';
-          const dayShifts = data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===weekOffset).sort((a,b)=>a.startH-b.startH);
+          const dayShifts = data.shifts.filter(s=>s.emp===emp&&s.day===di&&s.week===getWeekKey(weekOffset)).sort((a,b)=>a.startH-b.startH);
           const fullWidthShifts = dayShifts.filter(s=>(s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true);
           const normalShifts = dayShifts.filter(s=>!((s.startH===0&&s.endH===24&&s.dayOff)||s.fullDay===true));
           const amShifts = normalShifts.filter(s=>s.startH<12);

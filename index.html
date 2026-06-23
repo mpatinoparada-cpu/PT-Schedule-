@@ -445,6 +445,11 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
       <label>Note</label>
       <textarea id="m-note" placeholder="Ej: e.g. client meeting, covering for John, training..."></textarea>
     </div>
+    <!-- Move to week -->
+    <div id="move-week-section" style="display:none;margin-bottom:4px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:6px;font-weight:500;">Mover a otra semana</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;" id="move-week-btns"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-danger btn-sm del-btn" id="del-btn" onclick="deleteCurrentShift()" style="display:none">
         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Eliminar
@@ -970,7 +975,7 @@ function renderGrid() {
             const periodShifts=data.shifts
               .map((s,idx)=>({s,idx}))
               .filter(({s})=>{
-                if(s.emp!==emp||s.day!==di||s.week!==weekOffset) return false;
+                if(s.emp!==emp||s.day!==di||s.week!==getWeekKey(weekOffset)) return false;
                 return isAM ? s.startH < 12 : s.startH >= 12;
               })
               .sort((a,b)=>a.s.startH-b.s.startH);
@@ -1230,6 +1235,7 @@ function openModal(dayIdx, emp, shIdx, defaultStart) {
   document.getElementById('m-note').value=sh?(sh.note||''):'';
   document.getElementById('del-btn').style.display=sh?'inline-flex':'none';
   document.getElementById('modal-overlay').classList.remove('hidden');
+  buildMoveWeekBtns();
   const preType = sh ? (sh.shiftType||'') : '';
   currentShiftType = preType;
   setTimeout(()=>selectType(preType), 10);
@@ -1332,6 +1338,41 @@ function confirmDateRange(){
   setStatus('Day Off range saved ✓');
 }
 function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');editingIdx=null;startRealtime();}
+
+function buildMoveWeekBtns(){
+  const section = document.getElementById('move-week-section');
+  const container = document.getElementById('move-week-btns');
+  container.innerHTML = '';
+  if(editingIdx === null){ section.style.display='none'; return; }
+  section.style.display = 'block';
+  // Show 4 weeks back and 4 weeks forward, excluding current week
+  for(let off = -4; off <= 4; off++){
+    if(off === weekOffset) continue;
+    const dates = getWeekDates(off);
+    const label = fmtDate(dates[0]) + ' – ' + fmtDate(dates[6]);
+    const isPast = off < weekOffset;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = isPast
+      ? 'background:#fef3c7;border-color:#fcd34d;color:#92400e;font-size:13px;'
+      : 'background:#d1fae5;border-color:#6ee7b7;color:#065f46;font-size:13px;';
+    btn.innerHTML = (isPast ? '◀ ' : '▶ ') + label;
+    btn.onclick = () => moveShiftToWeek(off);
+    container.appendChild(btn);
+  }
+}
+
+function moveShiftToWeek(targetOffset){
+  if(editingIdx === null) return;
+  const targetKey = getWeekKey(targetOffset);
+  data.shifts[editingIdx] = {...data.shifts[editingIdx], week: targetKey};
+  closeModal();
+  renderAll();
+  cloudSave();
+  const dates = getWeekDates(targetOffset);
+  showNotify('Turno movido a ' + fmtDate(dates[0]) + ' – ' + fmtDate(dates[6]) + ' ✓');
+  setStatus('Turno movido ✓');
+}
 
 function confirmShift(){
   const emp=document.getElementById('m-emp').value;

@@ -539,9 +539,9 @@ function migrateEmployees(arr){
 function migrateWeekKeys(shifts){
   if(!shifts || !shifts.length) return shifts;
   const now = new Date();
+  now.setHours(12,0,0,0);
   const todayMon = new Date(now);
   todayMon.setDate(now.getDate() - ((now.getDay()+6)%7));
-  todayMon.setHours(0,0,0,0);
   return shifts.map(s => {
     if(typeof s.week === 'number'){
       const mon = new Date(todayMon);
@@ -613,9 +613,13 @@ function fmtHShort(h) {
 }
 function todayIdx() { return (new Date().getDay() + 6) % 7; }
 function getWeekDates(off) {
-  const now = new Date(), day = now.getDay();
+  const now = new Date();
+  // Normalize to noon to avoid DST/timezone midnight-rollover bugs
+  now.setHours(12, 0, 0, 0);
+  const day = now.getDay();
   const mon = new Date(now);
   mon.setDate(now.getDate() - ((day+6)%7) + off*7);
+  mon.setHours(12, 0, 0, 0);
   return Array.from({length:7}, (_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 }
 function fmtDate(d) { return d.toLocaleDateString('en',{day:'numeric',month:'short'}); }
@@ -1301,8 +1305,8 @@ function confirmDateRange(){
   const from = document.getElementById('dr-from').value;
   const to   = document.getElementById('dr-to').value;
   if(!from||!to){alert('Please select both dates.');return;}
-  const d1 = new Date(from+'T00:00:00');
-  const d2 = new Date(to  +'T00:00:00');
+  const d1 = new Date(from+'T12:00:00');
+  const d2 = new Date(to  +'T12:00:00');
   if(d2<d1){alert('End date must be after start date.');return;}
 
   // Iterate each day in the range and add a Day Off shift

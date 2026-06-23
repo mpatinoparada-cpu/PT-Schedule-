@@ -445,10 +445,35 @@ td.day-td:hover .empty-slot .plus{border-color:var(--accent);color:var(--accent)
       <label>Note</label>
       <textarea id="m-note" placeholder="Ej: e.g. client meeting, covering for John, training..."></textarea>
     </div>
-    <!-- Move to week -->
+    <!-- Move to week calendar -->
     <div id="move-week-section" style="display:none;margin-bottom:4px;">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:6px;font-weight:500;">Mover a otra semana</div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;" id="move-week-btns"></div>
+      <button class="btn btn-sm" id="move-cal-toggle" onclick="toggleMoveCalendar()" style="background:#ede9fe;border-color:#c4b5f4;color:#6d28d9;width:100%;justify-content:center;gap:6px;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Seleccionar semana en calendario
+      </button>
+      <div id="move-calendar" style="display:none;margin-top:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="movCalPrev()" style="padding:4px 8px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span id="mov-cal-month" style="font-size:14px;font-weight:600;color:var(--text);"></span>
+          <button class="btn btn-ghost btn-sm" onclick="movCalNext()" style="padding:4px 8px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px;">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">L</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">M</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">M</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">J</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">V</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">S</div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-align:center;">D</div>
+        </div>
+        <div id="mov-cal-days" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+        <div id="mov-cal-preview" style="margin-top:8px;font-size:12px;color:var(--accent);font-weight:500;min-height:16px;text-align:center;"></div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-danger btn-sm del-btn" id="del-btn" onclick="deleteCurrentShift()" style="display:none">
@@ -1345,25 +1370,114 @@ function closeModal(){document.getElementById('modal-overlay').classList.add('hi
 
 function buildMoveWeekBtns(){
   const section = document.getElementById('move-week-section');
-  const container = document.getElementById('move-week-btns');
-  container.innerHTML = '';
   if(editingIdx === null){ section.style.display='none'; return; }
   section.style.display = 'block';
-  // Show 4 weeks back and 4 weeks forward, excluding current week
-  for(let off = -4; off <= 4; off++){
-    if(off === weekOffset) continue;
-    const dates = getWeekDates(off);
-    const label = fmtDate(dates[0]) + ' – ' + fmtDate(dates[6]);
-    const isPast = off < weekOffset;
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-sm';
-    btn.style.cssText = isPast
-      ? 'background:#fef3c7;border-color:#fcd34d;color:#92400e;font-size:13px;'
-      : 'background:#d1fae5;border-color:#6ee7b7;color:#065f46;font-size:13px;';
-    btn.innerHTML = (isPast ? '◀ ' : '▶ ') + label;
-    btn.onclick = () => moveShiftToWeek(off);
-    container.appendChild(btn);
+  document.getElementById('move-calendar').style.display = 'none';
+  document.getElementById('mov-cal-preview').textContent = '';
+}
+
+let movCalYear, movCalMonth, movCalSelectedWeekKey = null;
+
+function toggleMoveCalendar(){
+  const cal = document.getElementById('move-calendar');
+  const visible = cal.style.display !== 'none';
+  if(visible){ cal.style.display='none'; return; }
+  const now = new Date();
+  movCalYear = now.getFullYear();
+  movCalMonth = now.getMonth();
+  movCalSelectedWeekKey = null;
+  renderMoveCalendar();
+  cal.style.display = 'block';
+}
+
+function movCalPrev(){ movCalMonth--; if(movCalMonth<0){movCalMonth=11;movCalYear--;} renderMoveCalendar(); }
+function movCalNext(){ movCalMonth++; if(movCalMonth>11){movCalMonth=0;movCalYear++;} renderMoveCalendar(); }
+
+function renderMoveCalendar(){
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('mov-cal-month').textContent = monthNames[movCalMonth] + ' ' + movCalYear;
+
+  const container = document.getElementById('mov-cal-days');
+  container.innerHTML = '';
+
+  // First day of month
+  const first = new Date(movCalYear, movCalMonth, 1);
+  // Offset: Monday=0
+  let startOffset = (first.getDay() + 6) % 7;
+
+  // Total days in month
+  const daysInMonth = new Date(movCalYear, movCalMonth+1, 0).getDate();
+
+  // Current week key to highlight
+  const currentWkKey = getWeekKey(weekOffset);
+  const todayKey = (()=>{ const n=new Date(); n.setHours(12,0,0,0); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })();
+
+  // Empty cells before first day
+  for(let i=0;i<startOffset;i++){
+    const empty = document.createElement('div');
+    container.appendChild(empty);
   }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const date = new Date(movCalYear, movCalMonth, d, 12, 0, 0);
+    // Get the Monday of this day's week
+    const mon = new Date(date);
+    mon.setDate(date.getDate() - ((date.getDay()+6)%7));
+    const wkKey = mon.getFullYear()+'-'+String(mon.getMonth()+1).padStart(2,'0')+'-'+String(mon.getDate()).padStart(2,'0');
+
+    const isCurrentWeek = wkKey === currentWkKey;
+    const isSelected = wkKey === movCalSelectedWeekKey;
+    const dateStr = movCalYear+'-'+String(movCalMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isToday = dateStr === todayKey;
+
+    const cell = document.createElement('div');
+    cell.textContent = d;
+    cell.style.cssText = [
+      'text-align:center',
+      'padding:5px 2px',
+      'border-radius:6px',
+      'font-size:13px',
+      'cursor:pointer',
+      'transition:background 0.1s',
+      isSelected ? 'background:var(--accent);color:#fff;font-weight:700;' :
+      isCurrentWeek ? 'background:var(--border2);color:var(--muted);cursor:not-allowed;font-style:italic;' :
+      isToday ? 'background:var(--accent-light);color:var(--accent);font-weight:600;' :
+      'color:var(--text);'
+    ].join(';');
+
+    if(!isCurrentWeek){
+      cell.addEventListener('click', ()=>{
+        movCalSelectedWeekKey = wkKey;
+        // Preview label
+        const monEnd = new Date(mon); monEnd.setDate(mon.getDate()+6);
+        document.getElementById('mov-cal-preview').textContent =
+          '→ Semana del ' + fmtDate(mon) + ' al ' + fmtDate(monEnd);
+        // Highlight whole week
+        renderMoveCalendar();
+        // Immediately move
+        moveShiftToWeekKey(wkKey, mon);
+      });
+      cell.addEventListener('mouseenter', ()=>{ if(!isSelected) cell.style.background='var(--accent-light)'; cell.style.color='var(--accent)'; });
+      cell.addEventListener('mouseleave', ()=>{
+        if(!isSelected) cell.style.background = isToday?'var(--accent-light)':'';
+        if(!isSelected) cell.style.color = isToday?'var(--accent)':'var(--text)';
+      });
+    }
+
+    container.appendChild(cell);
+  }
+}
+
+function moveShiftToWeekKey(targetKey, monDate){
+  if(editingIdx === null) return;
+  data.shifts[editingIdx] = {...data.shifts[editingIdx], week: targetKey};
+  document.getElementById('move-calendar').style.display = 'none';
+  closeModal();
+  renderAll();
+  cloudSave();
+  const monEnd = new Date(monDate); monEnd.setDate(monDate.getDate()+6);
+  showNotify('Turno movido a ' + fmtDate(monDate) + ' – ' + fmtDate(monEnd) + ' ✓');
+  setStatus('Turno movido ✓');
 }
 
 function moveShiftToWeek(targetOffset){
